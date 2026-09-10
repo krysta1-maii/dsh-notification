@@ -1,6 +1,6 @@
 # dsh-notification
 
-DeepSeek Harness Web GUI 的桌面通知插件。当会话结束一轮任务时，浏览器通过系统 `Notification` API 弹出通知，让你切到别的标签页也能知道 DSH 已经完成。按结束状态开关 + 关键词包含/排除规则，精确控制哪些完成要提醒。
+DeepSeek Harness Web GUI 的桌面通知插件。当会话结束一轮任务时，浏览器通过系统 `Notification` API 弹出通知，让你切到别的标签页也能知道 DSH 已经完成。按结束状态开关 + 关键词包含/排除规则，精确控制哪些完成要提醒。点击完成或等待交互的通知会把 DSH 窗口带到前台，并切到产生通知的会话对话页；测试通知仅聚焦窗口。
 
 **无需改动 harness**：host 侧贡献一个会话投影（每个会话最近完成一轮的有界摘要），client 侧监听会话列表的完成提醒，并应用自己持久化的偏好设置。
 
@@ -9,17 +9,18 @@ host:   notification 投影（最近一轮的原因/正文/工具名） --sessio
 client: 会话列表完成提醒（实时、去重）+ 持久化设置
         -> 权限 + 当前会话可见性门控
         -> new Notification("DSH 已完成", { body: "部署完成" })
+        -> 点击：聚焦窗口 + 打开该会话的对话页
 ```
 
 ## 安装
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-notification/archive/refs/tags/v0.1.4.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-notification/archive/refs/tags/v0.2.0.tar.gz
 ```
 
-随后重启 web 服务以加载 host 半部分与新的 client bundle。默认的 `dsh web` profile 已包含所需 client 组合（会话列表、设置外壳、locale）。
+随后重启 web 服务以加载 host 半部分与新的 client bundle。默认的 `dsh web` profile 已包含所需 client 组合（会话列表、设置外壳、locale 及工作区导航服务）。
 
-`0.1.4` 同时兼容 Harness 0.1.1 与 0.1.2 的客户端包结构和投影契约。
+`0.2.0` 仍兼容 Harness 0.1.1 与 0.1.2 的客户端包结构和投影契约。点击通知切换会话需要 Harness 提供工作区导航服务（`uiWorkspace`，0.1.5-rc.1 及提供该服务的版本均具备）；缺失时点击退化为仅聚焦窗口。
 
 设置段位于 **设置 > 通知**。
 
@@ -70,14 +71,14 @@ pnpm run test           # vitest（host 投影 + 组合、client 判定/runner/�
 pnpm run build          # esbuild host/client/invariant 打包 + tsc 声明
 ```
 
-仓库依赖同级 `../dsh` 仓库用于开发期 `link:` 解析。组合测试用真实 `SessionStore` 与 `SessionProjectionRegistry` 验证投影折叠。
+仓库依赖同级 `../deepseek-harness` 仓库用于开发期 `link:` 解析。组合测试用真实 `SessionStore` 与 `SessionProjectionRegistry` 验证投影折叠。
 
 ## 已知限制
 
 - 通知需要页面处于打开状态（隐藏时可弹，但关闭标签页后不再弹），且需授予 Notification 权限；站点权限被拒后无法从页面内恢复。
 - 通知在每轮结束（任意会话的 running→idle 边沿）触发一次；断线期间完成的轮次在重连后不会补发。
 - 规则匹配对象为会话标题 + 最近一轮的回复文本与工具名，不匹配更早的轮次。
-- 通知正文是纯文本摘要；点击仅聚焦窗口（不深链到具体轮次）。
+- 通知正文是纯文本摘要。点击完成或等待交互的通知会聚焦 DSH 窗口并打开产生该通知的会话对话页；不深链到该会话中的具体轮次。当该会话已不在列表中，或工作区导航服务不可用时，点击退化为仅聚焦窗口。
 
 ## License
 

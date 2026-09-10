@@ -1,6 +1,6 @@
 # dsh-notification
 
-Desktop notifications for the DeepSeek Harness web GUI. When a session finishes a turn, the browser shows a system notification (via the `Notification` API), so you can switch tabs and still know when DSH is done. Per-outcome toggles and include/exclude keyword rules control exactly which completions notify.
+Desktop notifications for the DeepSeek Harness web GUI. When a session finishes a turn, the browser shows a system notification (via the `Notification` API), so you can switch tabs and still know when DSH is done. Per-outcome toggles and include/exclude keyword rules control exactly which completions notify. Clicking a completion or pending notification brings the DSH window forward and switches to the originating session's conversation; test notifications only focus the window.
 
 No harness change is needed: the host contributes a session projection (a bounded summary of each session's last completed turn), and the client watches the session list's completion reminder and applies its own persisted preferences.
 
@@ -9,17 +9,18 @@ host:  notification projection (last turn's reason/text/tools) --session/project
 client: session list completion reminder (live, dedup) + persisted settings
         -> permission + current-session visibility gate
         -> new Notification("DSH finished", { body: "deploy done" })
+        -> click: focus the window + open that session's conversation page
 ```
 
 ## Install
 
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-notification/archive/refs/tags/v0.1.4.tar.gz
+dsh plugin --profile web add https://github.com/omdsh-dev/dsh-notification/archive/refs/tags/v0.2.0.tar.gz
 ```
 
-Restart the web server so the host half and the served client bundle pick up the plugin. The default `dsh web` profile has the required client composition (the session list, the settings shell, and locale).
+Restart the web server so the host half and the served client bundle pick up the plugin. The default `dsh web` profile has the required client composition (the session list, the settings shell, locale, and the workspace navigation service).
 
-Version `0.1.4` supports both the 0.1.1 and 0.1.2 Harness client package layouts and projection contracts.
+Version `0.2.0` still supports the 0.1.1 and 0.1.2 Harness client package layouts and projection contracts. Switching to the notification's session on click needs the Harness workspace navigation service (`uiWorkspace`), which 0.1.5-rc.1 and other builds providing that service expose; where it is missing the click degrades to focusing the window.
 
 The settings section lives under **Settings > Notifications**.
 
@@ -70,14 +71,14 @@ pnpm run test           # vitest (host projection + composition, client decision
 pnpm run build          # esbuild host/client/invariant bundles + tsc declarations
 ```
 
-The repo expects the harness checkout at `../dsh` for the dev-time `link:` resolutions. The composition spec boots the real `SessionStore` and `SessionProjectionRegistry` and proves the fold.
+The repo expects the harness checkout at `../deepseek-harness` for the dev-time `link:` resolutions. The composition spec boots the real `SessionStore` and `SessionProjectionRegistry` and proves the fold.
 
 ## Known limitations
 
 - Notifications require the page to be open (the browser shows them while it is hidden, but not after the tab is closed) and Notification permission granted; a denied site permission cannot be overridden from inside the page.
 - Notifications fire once per finished turn (a running→idle edge on any session); a completion that happened while the page was disconnected is not re-notified on reconnect.
 - The rule subject is the session title plus the last turn's reply text and tool names — earlier turns are not matched.
-- Notification body is a flat text snippet; the click action only focuses the window (no deep link to the turn).
+- Notification body is a flat text snippet. Clicking a completion or pending notification focuses the DSH window and opens the originating session's conversation page; the exact turn inside it is not deep-linked. When that session is no longer listed or the workspace navigation service is unavailable, the click degrades to focusing the window.
 
 ## License
 
