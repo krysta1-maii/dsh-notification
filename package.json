@@ -92,16 +92,16 @@
     }
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "link:../dsh/vendor/cordis",
-    "@deepseek-ai/dsh-session": "link:../dsh/packages/core/session",
-    "@deepseek-ai/dsh-session-projection": "link:../dsh/packages/session/session-projection",
-    "@deepseek-ai/dsh-invariants": "link:../dsh/packages/runtime-diagnostics/invariants",
-    "@deepseek-ai/dsh-client-store": "link:../dsh/packages/client/store",
-    "@deepseek-ai/dsh-client-ui-slots": "link:../dsh/packages/client/ui-slots",
-    "@deepseek-ai/dsh-client-ui-settings": "link:../dsh/packages/client/ui-settings",
-    "@deepseek-ai/dsh-client-locale": "link:../dsh/packages/client/locale",
-    "@deepseek-ai/dsh-llm": "link:../dsh/packages/llm/llm",
-    "@deepseek-ai/schemastery": "link:../dsh/vendor/schemastery",
+    "@deepseek-ai/cordis": "link:../deepseek-harness/vendor/cordis",
+    "@deepseek-ai/dsh-session": "link:../deepseek-harness/packages/core/session",
+    "@deepseek-ai/dsh-session-projection": "link:../deepseek-harness/packages/session/session-projection",
+    "@deepseek-ai/dsh-invariants": "link:../deepseek-harness/packages/runtime-diagnostics/invariants",
+    "@deepseek-ai/dsh-client-store": "link:../deepseek-harness/packages/client/store",
+    "@deepseek-ai/dsh-client-ui-slots": "link:../deepseek-harness/packages/client/ui-slots",
+    "@deepseek-ai/dsh-client-ui-settings": "link:../deepseek-harness/packages/client/ui-settings",
+    "@deepseek-ai/dsh-client-locale": "link:../deepseek-harness/packages/client/locale",
+    "@deepseek-ai/dsh-llm": "link:../deepseek-harness/packages/llm/llm",
+    "@deepseek-ai/schemastery": "link:../deepseek-harness/vendor/schemastery",
     "@types/node": "^24.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
@@ -112,7 +112,7 @@
     "react-dom": "^18.2.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",
-    "@deepseek-ai/dsh-typert-registry": "link:../dsh/packages/typert/registry"
+    "@deepseek-ai/dsh-typert-registry": "link:../deepseek-harness/packages/typert/registry"
   },
   "dependencies": {
     "zod": "^4.4.3"

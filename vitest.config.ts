@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
-const dsh = (relative) => fileURLToPath(new URL(`../dsh/${relative}`, import.meta.url))
+const dsh = (relative) => fileURLToPath(new URL(`../deepseek-harness/${relative}`, import.meta.url))
 
 export default defineConfig({
   resolve: {
