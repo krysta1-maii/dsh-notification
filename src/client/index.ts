@@ -18,6 +18,7 @@ import { NotificationSettingsSection, type NotificationSectionInjected } from '.
 import { NS, en, zh } from './locales.ts'
 import { adoptStyles } from './styles.ts'
 import { createNotificationSettingsStore } from './store.ts'
+import { activateNotificationTarget, type NotificationClickTarget } from './click.ts'
 import { notificationFor, pendingAdvance, pendingNotificationFor, projectionAdvance } from './runner.ts'
 import {
   bodyText,
@@ -35,6 +36,11 @@ export const inject = ['sessions', 'slots', 'locale']
 /** The slice of the sessions service this plugin reads. */
 interface SessionsListFace {
   readonly list: { getSnapshot(): NotificationSessionListState; subscribe(listener: () => void): () => void }
+}
+
+/** The slice of the workspace navigation service this plugin reads. */
+interface UiWorkspaceFace {
+  openSession(id: SessionId): void
 }
 
 type SessionId = string
@@ -93,6 +99,23 @@ export function apply(ctx: ClientContext): void {
   // single-program build.
   const sessions = ctx.get('sessions') as unknown as SessionsListFace
   const uiSession = ctx.get('uiSession') as unknown as UiSessionFace | undefined
+  // The workspace navigation service is optional and injected lazily (never in
+  // the exported `inject` list): web boot fails the whole entry while any
+  // required service stays pending. When it is absent the plugin still loads,
+  // and a click simply focuses the window.
+  let uiWorkspace: UiWorkspaceFace | undefined
+  ctx.inject(['uiWorkspace'], (scope) => {
+    uiWorkspace = scope.get('uiWorkspace') as unknown as UiWorkspaceFace | undefined
+    return () => { uiWorkspace = undefined }
+  })
+  // Re-read the live list at click time: a session that was archived since the
+  // notification appeared must not be opened (openSession throws on an unlisted
+  // id, and the click handler must never throw).
+  const isListed = (id: SessionId): boolean => {
+    const state = sessions.list.getSnapshot()
+    return state.ids.includes(id) || state.byId[id] !== undefined
+  }
+  const log = (message: string): void => { console.info(message) }
   const slots = (ctx as unknown as { slots: SlotsFace }).slots
   const settings: SnapshotStore<NotificationSettings> = createNotificationSettingsStore()
   const set = (patch: Partial<NotificationSettings>): void => {
@@ -101,13 +124,29 @@ export function apply(ctx: ClientContext): void {
   const requestPermission = (): Promise<NotificationPermission> =>
     notificationsApi()?.requestPermission() ?? Promise.resolve<NotificationPermission>('denied')
 
-  const show = (title: string, body: string, tag: string, requireInteraction: boolean): NotificationCreationResult => {
+  const show = (
+    title: string,
+    body: string,
+    tag: string,
+    requireInteraction: boolean,
+    target?: NotificationClickTarget,
+  ): NotificationCreationResult => {
     const result = createBrowserNotification(notificationsApi(), title, { body, tag, requireInteraction })
     if (!result.ok) {
       console.error(`[dsh-notification] notification creation failed: ${result.message}`)
       return result
     }
-    result.notification.onclick = () => { window.focus() }
+    result.notification.onclick = () => {
+      window.focus()
+      // Resolve the service at click time (not show time): it may load after the
+      // notification appeared, and the session may have left the list.
+      const navigation = uiWorkspace
+      activateNotificationTarget(target, {
+        isListed,
+        openSession: navigation === undefined ? undefined : navigation.openSession.bind(navigation),
+        log,
+      })
+    }
     result.notification.onerror = () => {
       console.error('[dsh-notification] the browser reported a notification delivery error')
     }
@@ -159,6 +198,7 @@ export function apply(ctx: ClientContext): void {
             bodyText(plan.body, t('notify.emptyBody')),
             plan.tag,
             current.requireInteraction,
+            { sessionId: id },
           )
         }
       }
@@ -226,6 +266,7 @@ export function apply(ctx: ClientContext): void {
             bodyText(plan.body, t('notify.pendingBody')),
             plan.tag,
             current.requireInteraction,
+            { sessionId: id },
           )
         }
       }
