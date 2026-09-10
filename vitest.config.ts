@@ -10,6 +10,9 @@ export default defineConfig({
       // crash under Node; tests resolve the same entries to their sources.
       '@deepseek-ai/dsh-client-runtime/client': dsh('packages/client/runtime/src/client/index.ts'),
       '@deepseek-ai/dsh-client-connection/client': dsh('packages/client/connection/src/client/index.ts'),
+      // The source checkout has no built store lib; resolve the bare specifier
+      // to its source entry (exports createSnapshotStore and SnapshotStore).
+      '@deepseek-ai/dsh-client-store': dsh('packages/client/store/src/index.ts'),
     },
   },
   test: {
