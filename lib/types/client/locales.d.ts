@@ -1,6 +1,7 @@
 /**
- * `notification` locale namespace: the settings-section copy and the desktop
- * notification titles/bodies. Chinese is the product copy; English mirrors it.
+ * `notification` locale namespace: the settings-section copy and the system
+ * notification/in-app reminder titles, bodies, and actions. Chinese is the
+ * product copy; English mirrors it.
  */
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export declare const zh: {
@@ -62,6 +63,9 @@ export declare const zh: {
     'notify.titlePlanReview': string;
     'notify.pendingBody': string;
     'notify.emptyBody': string;
+    'notify.open': string;
+    'notify.dismiss': string;
+    'notify.inAppLabel': string;
     'notify.testTitle': string;
     'notify.testBody': string;
 };
@@ -127,6 +131,9 @@ export declare const en: {
     'notify.titlePlanReview': string;
     'notify.pendingBody': string;
     'notify.emptyBody': string;
+    'notify.open': string;
+    'notify.dismiss': string;
+    'notify.inAppLabel': string;
     'notify.testTitle': string;
     'notify.testBody': string;
 };

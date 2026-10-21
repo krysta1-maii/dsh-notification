@@ -8,18 +8,16 @@
  */
 import type { NotificationProjectionValue, NotificationReason, NotificationSettings, PendingKind } from '../contract.ts';
 /**
- * Fold one session's projection-turn observation: the first observation seeds
- * the baseline (never fires), and any later advance means the host projection
- * has landed for a NEW completed turn — the fresh value to notify with. Firing
- * on the projection advance (not on a running edge) removes the race between
- * the status frame and the projection frame, so the notification body is
- * always the turn that just completed.
- * @param prevTurn - the turn last observed for the session (undefined = seed).
- * @param projection - the current host projection value (absent = turn 0).
- * @returns the next observed turn and whether it advanced past the previous.
+ * Fold one session's projection-turn observation: the first available value
+ * seeds the baseline without firing. Missing or older projections must not
+ * lower that baseline, or restoring history would look like a new completion.
+ * Only a later turn advance fires, using that projection's reason and body.
+ * @param prevTurn - the highest observed turn (undefined = not yet seeded).
+ * @param projection - the current host projection value (absent = not loaded).
+ * @returns the next baseline and whether a newer completed turn was observed.
  */
 export declare function projectionAdvance(prevTurn: number | undefined, projection: NotificationProjectionValue | undefined): {
-    nextTurn: number;
+    nextTurn: number | undefined;
     fresh: boolean;
 };
 /** A decided notification ready to surface. */

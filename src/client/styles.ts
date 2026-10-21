@@ -2,7 +2,7 @@
  * The settings-section stylesheet, hand-written as a template string and
  * injected once by the plugin body: the web server serves exactly one file per
  * client plugin, so no separate CSS artifact may exist. Tokens come only from
- * the shared `--dsw-alias-*` design platform (no literal colors); class names
+ * the shared `--dsw-*` design platform (no literal colors); class names
  * carry the `dsh_notification` prefix to stay unique in the assembled shell.
  */
 
@@ -258,6 +258,64 @@ export const cssText = `
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
+}
+.dsh_notification_toastStack {
+  position: fixed;
+  top: 40px;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  z-index: 1100;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: min(640px, calc(100vw - 48px));
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+.dsh_notification_toast {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  min-width: 0;
+  max-width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-toast-bg);
+  color: var(--dsw-alias-toast-label);
+  font-size: 14px;
+  line-height: 22px;
+  box-shadow: var(--dsw-shadow-lv3);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.dsh_notification_toastText {
+  min-width: 0;
+}
+.dsh_notification_toastAction {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-static-deepseek-400);
+  font: inherit;
+  cursor: pointer;
+  margin-inline: 3px;
+  pointer-events: auto;
+}
+.dsh_notification_toastAction:hover {
+  opacity: 0.8;
+}
+.dsh_notification_toastAction:focus-visible {
+  outline: 2px solid var(--dsw-static-deepseek-400);
+  outline-offset: 2px;
 }
 `
 

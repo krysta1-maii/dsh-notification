@@ -11,22 +11,21 @@ import { asReason, pendingReasonEnabled, ruleSubject, rulesAllow, shouldNotify }
 import { notificationTag, pendingNotificationTag } from './notifier.ts'
 
 /**
- * Fold one session's projection-turn observation: the first observation seeds
- * the baseline (never fires), and any later advance means the host projection
- * has landed for a NEW completed turn — the fresh value to notify with. Firing
- * on the projection advance (not on a running edge) removes the race between
- * the status frame and the projection frame, so the notification body is
- * always the turn that just completed.
- * @param prevTurn - the turn last observed for the session (undefined = seed).
- * @param projection - the current host projection value (absent = turn 0).
- * @returns the next observed turn and whether it advanced past the previous.
+ * Fold one session's projection-turn observation: the first available value
+ * seeds the baseline without firing. Missing or older projections must not
+ * lower that baseline, or restoring history would look like a new completion.
+ * Only a later turn advance fires, using that projection's reason and body.
+ * @param prevTurn - the highest observed turn (undefined = not yet seeded).
+ * @param projection - the current host projection value (absent = not loaded).
+ * @returns the next baseline and whether a newer completed turn was observed.
  */
 export function projectionAdvance(
   prevTurn: number | undefined,
   projection: NotificationProjectionValue | undefined,
-): { nextTurn: number; fresh: boolean } {
-  const turn = projection?.turn ?? 0
-  return { nextTurn: turn, fresh: prevTurn !== undefined && turn > prevTurn }
+): { nextTurn: number | undefined; fresh: boolean } {
+  if (projection === undefined) return { nextTurn: prevTurn, fresh: false }
+  const turn = projection.turn
+  return { nextTurn: Math.max(prevTurn ?? turn, turn), fresh: prevTurn !== undefined && turn > prevTurn }
 }
 
 /** A decided notification ready to surface. */

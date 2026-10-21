@@ -103,8 +103,33 @@ describe('projectionAdvance', () => {
     expect(projectionAdvance(6, { turn: 6, reason: 'completed', body: 'new', tools: [] })).toEqual({ nextTurn: 6, fresh: false })
   })
 
-  it('treats an absent projection as turn 0', () => {
-    expect(projectionAdvance(undefined, undefined)).toEqual({ nextTurn: 0, fresh: false })
-    expect(projectionAdvance(0, { turn: 1, reason: 'completed', body: 'first', tools: [] })).toEqual({ nextTurn: 1, fresh: true })
+  it('waits for the first available projection before seeding history', () => {
+    const missing = projectionAdvance(undefined, undefined)
+    expect(missing).toEqual({ nextTurn: undefined, fresh: false })
+    expect(projectionAdvance(missing.nextTurn, { turn: 37, reason: 'completed', body: 'old', tools: [] }))
+      .toEqual({ nextTurn: 37, fresh: false })
+  })
+
+  it('preserves the observed turn while the projection is absent', () => {
+    const missing = projectionAdvance(37, undefined)
+    expect(missing).toEqual({ nextTurn: 37, fresh: false })
+    expect(projectionAdvance(missing.nextTurn, { turn: 37, reason: 'completed', body: 'old', tools: [] }))
+      .toEqual({ nextTurn: 37, fresh: false })
+    expect(projectionAdvance(missing.nextTurn, { turn: 38, reason: 'completed', body: 'new', tools: [] }))
+      .toEqual({ nextTurn: 38, fresh: true })
+  })
+
+  it.each([0, 12])('does not lower the observed turn for a stale projection at turn %s', turn => {
+    const stale = projectionAdvance(37, { turn, reason: 'completed', body: 'stale', tools: [] })
+    expect(stale).toEqual({ nextTurn: 37, fresh: false })
+    expect(projectionAdvance(stale.nextTurn, { turn: 37, reason: 'completed', body: 'old', tools: [] }))
+      .toEqual({ nextTurn: 37, fresh: false })
+  })
+
+  it('still notifies the first completion after an actual turn-zero projection', () => {
+    const empty = projectionAdvance(undefined, { turn: 0, reason: '', body: '', tools: [] })
+    expect(empty).toEqual({ nextTurn: 0, fresh: false })
+    expect(projectionAdvance(empty.nextTurn, { turn: 1, reason: 'completed', body: 'first', tools: [] }))
+      .toEqual({ nextTurn: 1, fresh: true })
   })
 })

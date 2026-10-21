@@ -71,9 +71,22 @@ export interface NotificationSettings {
   readonly notifyPlanReview: boolean
   /** Ordered include/exclude filters over the session title, reply text, and tool names. */
   readonly rules: NotificationRule[]
-  /** When true, the browser keeps the notification until the user dismisses it. */
+  /**
+   * Disable in-app toast expiry (the five-toast cap still applies; open/dismiss
+   * removes a toast) and request persistent system notifications (browser/OS
+   * support varies).
+   */
   readonly requireInteraction: boolean
-  /** When true, only notify while the page is hidden (the tab is not focused). */
+  /**
+   * Completion and pending reminders share this routing. When true, a hidden
+   * or unfocused window uses system notifications for any session, including
+   * the main view. A visible, focused window shows clickable, dismissible in-app
+   * toasts only for non-main-view conversations; mainView conversations are
+   * suppressed. System notifications require granted permission; in-app toasts
+   * do not. False uses system notifications in foreground and background,
+   * including the current conversation. Manual tests always use the system
+   * channel and bypass this routing; the renderer must remain alive.
+   */
   readonly backgroundOnly: boolean
 }
 

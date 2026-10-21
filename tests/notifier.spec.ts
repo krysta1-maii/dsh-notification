@@ -1,15 +1,15 @@
 /**
  * Client notification helpers: localized titles, body selection, the
- * permission/background gate, and the per-session grouping tag.
+ * layered surface routing, and the per-session grouping tag.
  */
 import { describe, expect, it } from 'vitest'
 import {
   bodyText,
   createBrowserNotification,
+  notificationSurface,
   notificationTag,
   pendingNotificationTag,
   pendingTitleKey,
-  shouldShow,
   titleKey,
 } from '../src/client/notifier.ts'
 
@@ -33,22 +33,35 @@ describe('bodyText', () => {
   })
 })
 
-describe('shouldShow', () => {
-  it('requires granted permission', () => {
-    expect(shouldShow('default', false, true)).toBe(false)
-    expect(shouldShow('denied', false, true)).toBe(false)
-    expect(shouldShow('granted', false, true)).toBe(true)
+describe('notificationSurface', () => {
+  const permissions = ['granted', 'default', 'denied'] as const
+  const windows = [
+    { hidden: false, focused: true },
+    { hidden: false, focused: false },
+    { hidden: true, focused: true },
+    { hidden: true, focused: false },
+  ]
+
+  it.each(permissions)('uses in-app reminders for a foreground non-main session regardless of permission (%s)', permission => {
+    expect(notificationSurface(permission, true, false, true, false)).toBe('in-app')
   })
 
-  it('honors the background-only gate', () => {
-    expect(shouldShow('granted', true, false, 'session-a', 'session-a')).toBe(false)
-    expect(shouldShow('granted', true, true, 'session-a', 'session-a')).toBe(true)
-    expect(shouldShow('granted', false, false, 'session-a', 'session-a')).toBe(true)
+  it.each(permissions)('suppresses the foreground main session regardless of permission (%s)', permission => {
+    expect(notificationSurface(permission, true, false, true, true)).toBe('none')
   })
 
-  it('notifies for another session while DSH is visible', () => {
-    expect(shouldShow('granted', true, false, 'session-a', 'session-b')).toBe(true)
-    expect(shouldShow('granted', true, false, 'session-a', undefined)).toBe(true)
+  it.each(permissions.flatMap(permission => windows.slice(1).flatMap(window =>
+    [false, true].map(sessionInView => ({ permission, ...window, sessionInView })),
+  )))('uses only the system surface in background ($permission/$hidden/$focused/$sessionInView)', ({ permission, hidden, focused, sessionInView }) => {
+    expect(notificationSurface(permission, true, hidden, focused, sessionInView))
+      .toBe(permission === 'granted' ? 'system' : 'none')
+  })
+
+  it.each(permissions.flatMap(permission => windows.flatMap(window =>
+    [false, true].map(sessionInView => ({ permission, ...window, sessionInView })),
+  )))('keeps the always-system route when the switch is OFF ($permission/$hidden/$focused/$sessionInView)', ({ permission, hidden, focused, sessionInView }) => {
+    expect(notificationSurface(permission, false, hidden, focused, sessionInView))
+      .toBe(permission === 'granted' ? 'system' : 'none')
   })
 })
 

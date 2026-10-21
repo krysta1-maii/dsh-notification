@@ -31,21 +31,26 @@ export function bodyText(body: string, emptyBody: string): string {
   return trimmed === '' ? emptyBody : trimmed
 }
 
+/** The automatic notification channel, selected at event time. */
+export type NotificationSurface = 'system' | 'in-app' | 'none'
+
 /**
- * Whether a completion should surface a desktop notification, given the browser
- * permission, the background-only preference, page visibility, and whether
- * the completed session is the one currently in view.
+ * Background windows notify through the OS even for their main conversation.
+ * Foreground windows use an in-app toast for other conversations only. OS
+ * permission does not gate in-app reminders. Turning backgroundOnly off keeps
+ * the existing always-system behavior.
  */
-export function shouldShow(
+export function notificationSurface(
   permission: NotificationPermission,
   backgroundOnly: boolean,
   documentHidden: boolean,
-  completedSessionId?: string,
-  currentSessionId?: string,
-): boolean {
-  if (permission !== 'granted') return false
-  if (backgroundOnly && !documentHidden && completedSessionId === currentSessionId) return false
-  return true
+  documentFocused: boolean,
+  sessionInView: boolean,
+): NotificationSurface {
+  if (!backgroundOnly || documentHidden || !documentFocused) {
+    return permission === 'granted' ? 'system' : 'none'
+  }
+  return sessionInView ? 'none' : 'in-app'
 }
 
 /**

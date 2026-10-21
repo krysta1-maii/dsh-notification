@@ -10,12 +10,15 @@ export declare function titleKey(reason: NotificationReason): 'notify.titleCompl
 export declare function pendingTitleKey(kind: PendingKind): 'notify.titleApproval' | 'notify.titleQuestion' | 'notify.titlePlanReview';
 /** The notification body: the reply snippet, or the empty-body fallback. */
 export declare function bodyText(body: string, emptyBody: string): string;
+/** The automatic notification channel, selected at event time. */
+export type NotificationSurface = 'system' | 'in-app' | 'none';
 /**
- * Whether a completion should surface a desktop notification, given the browser
- * permission, the background-only preference, page visibility, and whether
- * the completed session is the one currently in view.
+ * Background windows notify through the OS even for their main conversation.
+ * Foreground windows use an in-app toast for other conversations only. OS
+ * permission does not gate in-app reminders. Turning backgroundOnly off keeps
+ * the existing always-system behavior.
  */
-export declare function shouldShow(permission: NotificationPermission, backgroundOnly: boolean, documentHidden: boolean, completedSessionId?: string, currentSessionId?: string): boolean;
+export declare function notificationSurface(permission: NotificationPermission, backgroundOnly: boolean, documentHidden: boolean, documentFocused: boolean, sessionInView: boolean): NotificationSurface;
 /**
  * The grouping tag: one notification slot per session per turn. Turn-scoped
  * (not session-scoped): the browser replaces same-tag notifications, and a

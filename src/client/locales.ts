@@ -1,22 +1,23 @@
 /**
- * `notification` locale namespace: the settings-section copy and the desktop
- * notification titles/bodies. Chinese is the product copy; English mirrors it.
+ * `notification` locale namespace: the settings-section copy and the system
+ * notification/in-app reminder titles, bodies, and actions. Chinese is the
+ * product copy; English mirrors it.
  */
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
   'nav': '通知',
   'settings.title': '任务完成通知',
-  'settings.subtitle': '当 DSH 完成一次操作时，通过浏览器系统通知提醒你；可以用关键词规则精确控制哪些消息需要提醒。',
+  'settings.subtitle': '当 DSH 完成操作或等待交互时，通过系统通知或应用内提醒通知你；可以用关键词规则控制哪些完成需要提醒。',
   'settings.enabled': '启用通知',
   'settings.enabledDesc': '关闭后不会弹出任何通知，规则与偏好设置仍会保留。',
   'settings.permission.title': '浏览器权限',
-  'settings.permission.desc': '通知需要浏览器授权。点击下方按钮授权，然后发送一条测试通知确认生效。',
+  'settings.permission.desc': '系统通知需要浏览器授权，应用内提醒无需此权限。点击下方按钮授权，然后发送一条系统测试通知。',
   'settings.permission.granted': '已授权',
   'settings.permission.denied': '已拒绝（请在浏览器地址栏的站点设置中重新开启）',
   'settings.permission.default': '未授权',
-  'settings.permission.defaultHint': '通知权限尚未授予：请先点击「请求通知权限」，并在浏览器弹出的提示中选择允许。',
-  'settings.permission.deniedHint': '通知权限已被拒绝：请在浏览器地址栏左侧的站点设置中重新开启通知，然后再试。',
+  'settings.permission.defaultHint': '系统通知权限尚未授予：点击「请求通知权限」，并在浏览器提示中选择允许；应用内提醒不受此权限影响。',
+  'settings.permission.deniedHint': '系统通知权限已被拒绝：请在浏览器地址栏左侧的站点设置中重新开启；应用内提醒不受此权限影响。',
   'settings.permission.request': '请求通知权限',
   'settings.permission.test': '发送测试通知',
   'settings.permission.testSent': '测试通知请求已发送。如果没有看到通知，请检查浏览器站点权限、系统通知设置以及专注或勿扰模式。',
@@ -50,9 +51,9 @@ export const zh = {
   'settings.rules.saveHint': '先填写规则模式，再点保存',
   'settings.advanced.title': '高级',
   'settings.advanced.requireInteraction': '需要手动关闭',
-  'settings.advanced.requireInteractionDesc': '通知保持显示，直到你手动关闭（适合重要任务）。',
-  'settings.advanced.backgroundOnly': '仅在任务不在眼前时通知',
-  'settings.advanced.backgroundOnlyDesc': '当前会话正在眼前时不提醒；页面在后台，或你正在查看其他会话、其他工作区时仍会提醒。',
+  'settings.advanced.requireInteractionDesc': '开启后，应用内提醒不自动消失，可打开或关闭；最多保留五条，超出时移除最早的一条。系统通知请求保持显示（取决于浏览器与系统支持）。',
+  'settings.advanced.backgroundOnly': '后台系统通知，前台应用内提醒',
+  'settings.advanced.backgroundOnlyDesc': '开启时，完成与等待交互共用此规则：窗口隐藏或失焦时，所有会话都使用系统通知（须已授权）；窗口可见且有焦点时，仅为非主视图会话显示可点击跳转、可关闭的应用内提醒，无需系统通知权限，主视图会话不提醒。关闭后前后台所有会话均使用系统通知，包括当前会话。测试始终使用系统通知并绕过此项；退出程序或销毁渲染页面后无法提醒。',
   'notify.titleCompleted': 'DSH 已完成任务',
   'notify.titleError': 'DSH 出错了',
   'notify.titleAborted': 'DSH 已中止',
@@ -63,6 +64,9 @@ export const zh = {
   'notify.titlePlanReview': 'DSH 需要你评审计划',
   'notify.pendingBody': '有待处理的操作',
   'notify.emptyBody': '任务已完成',
+  'notify.open': '打开对话',
+  'notify.dismiss': '关闭提醒',
+  'notify.inAppLabel': '对话提醒',
   'notify.testTitle': 'DSH 通知测试',
   'notify.testBody': '如果你看到这条通知，说明通知已配置成功。',
 } satisfies Record<string, string>
@@ -74,16 +78,16 @@ export type NotificationKey = keyof typeof zh
 export const en = {
   'nav': 'Notifications',
   'settings.title': 'Task completion notifications',
-  'settings.subtitle': 'Get a browser notification when DSH finishes an operation, with keyword rules to control exactly which messages notify.',
+  'settings.subtitle': 'Get system notifications or in-app reminders when DSH finishes an operation or waits for input, with keyword rules to filter completions.',
   'settings.enabled': 'Enable notifications',
   'settings.enabledDesc': 'Turning this off stops every notification; rules and preferences are kept.',
   'settings.permission.title': 'Browser permission',
-  'settings.permission.desc': 'Notifications need browser permission. Grant it below, then send a test notification to confirm it works.',
+  'settings.permission.desc': 'System notifications need browser permission; in-app reminders do not. Grant it below, then send a system test notification.',
   'settings.permission.granted': 'Granted',
   'settings.permission.denied': 'Denied (re-enable in the browser\'s site settings)',
   'settings.permission.default': 'Not granted',
-  'settings.permission.defaultHint': 'Notification permission is not granted yet: click Request permission and allow it in the browser prompt.',
-  'settings.permission.deniedHint': 'Notification permission was denied: re-enable notifications for this site in the browser\'s site settings, then try again.',
+  'settings.permission.defaultHint': 'System notification permission is not granted yet: click Request permission and allow it in the browser prompt. In-app reminders are unaffected.',
+  'settings.permission.deniedHint': 'System notification permission was denied: re-enable it in the browser\'s site settings. In-app reminders are unaffected.',
   'settings.permission.request': 'Request permission',
   'settings.permission.test': 'Send test notification',
   'settings.permission.testSent': 'The test notification was requested. If it is not visible, check the browser site permission, system notification settings, and Focus or Do Not Disturb mode.',
@@ -117,9 +121,9 @@ export const en = {
   'settings.rules.saveHint': 'Fill in the rule pattern first, then save',
   'settings.advanced.title': 'Advanced',
   'settings.advanced.requireInteraction': 'Require manual dismiss',
-  'settings.advanced.requireInteractionDesc': 'The notification stays until you dismiss it (for important tasks).',
-  'settings.advanced.backgroundOnly': 'Only notify when the task is out of view',
-  'settings.advanced.backgroundOnlyDesc': 'Suppress notifications only for the session currently in view; still notify in the background or while viewing another session or workspace.',
+  'settings.advanced.requireInteractionDesc': 'Disable automatic expiry for in-app toasts; open or dismiss to remove them. Only five are kept, so an additional toast evicts the oldest. Request persistent system notifications (browser/OS support varies).',
+  'settings.advanced.backgroundOnly': 'System notifications in background, in-app toasts in foreground',
+  'settings.advanced.backgroundOnlyDesc': 'When on, completion and pending reminders share this rule: hidden or unfocused windows use system notifications for any session (permission required). Visible, focused windows show clickable, dismissible in-app toasts only for conversations outside the main view, without OS notification permission; the main-view conversation is suppressed. Turn this off to use system notifications in foreground and background, including the current conversation. Tests always use system notifications and bypass this setting. Reminders stop if the app exits or the renderer is destroyed.',
   'notify.titleCompleted': 'DSH finished',
   'notify.titleError': 'DSH failed',
   'notify.titleAborted': 'DSH aborted',
@@ -130,6 +134,9 @@ export const en = {
   'notify.titlePlanReview': 'DSH needs your plan review',
   'notify.pendingBody': 'There is a pending action',
   'notify.emptyBody': 'The task is done',
+  'notify.open': 'Open conversation',
+  'notify.dismiss': 'Dismiss notification',
+  'notify.inAppLabel': 'Conversation notifications',
   'notify.testTitle': 'DSH notification test',
   'notify.testBody': 'If you can see this notification, notifications are configured correctly.',
 } satisfies Record<NotificationKey, string>
