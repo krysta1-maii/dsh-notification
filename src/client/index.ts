@@ -9,7 +9,8 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SnapshotStore } from './snapshot-store.ts'
-// Type-only: the ctx.locale Context merge.
+// Type-only: the connection/reset event and ctx.locale Context merges.
+import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the settings.section SlotMap entry.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'

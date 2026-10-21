@@ -2,5 +2,8 @@ packages:
   - '.'
 autoInstallPeers: false
 nodeLinker: hoisted
+storeDir: node_modules/.cache/pnpm-store
+# Keep checks read-only with respect to dependencies; install explicitly first.
+verifyDepsBeforeRun: false
 allowBuilds:
   esbuild: true

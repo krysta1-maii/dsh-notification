@@ -19,6 +19,7 @@ function assistant(turn: number, text: string): SessionEvent<'assistant/message'
     turn,
     step: 1,
     message: createAssistantMessage({ content: [{ type: 'text', text }], source: { provider: 'test', model: 'test' } }),
+    stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: [text] }],
   })
 }
 

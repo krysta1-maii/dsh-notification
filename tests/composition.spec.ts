@@ -29,7 +29,12 @@ describe('dsh-notification host composition', () => {
     const session = store.create(undefined, { meta: { cwd: '/tmp/dsh-notification' } })
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
-    session.append('assistant/message', { turn: 1, step: 1, message: reply('deploy done') }, { surfaceOp: 'append' })
+    session.append('assistant/message', {
+      turn: 1,
+      step: 1,
+      message: reply('deploy done'),
+      stream: [{ type: 'text-chunks', time0: 0, index: 0, dt: [], texts: ['deploy done'] }],
+    }, { surfaceOp: 'append' })
     session.append('tool/call', { turn: 1, step: 1, callId: 'c1' as never, name: 'bash', arguments: '{}' })
     session.append('step/end', { turn: 1, step: 1 })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
