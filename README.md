@@ -1,26 +1,32 @@
 # dsh-notification
 
-Desktop notifications for the DeepSeek Harness web GUI. When a session finishes a turn, the browser shows a system notification (via the `Notification` API), so you can switch tabs and still know when DSH is done. Per-outcome toggles and include/exclude keyword rules control exactly which completions notify. Clicking a completion or pending notification brings the DSH window forward and switches to the originating session's conversation; test notifications only focus the window.
+Completion and pending-interaction reminders for the DeepSeek Harness web GUI. By default (`backgroundOnly` on), a hidden or unfocused window uses system notifications (via the `Notification` API) for any session; a visible, focused window shows top-center compact horizontal in-app banners only for conversations outside the main view. These follow DSH's native visual style, not a bottom-right card layout. Per-outcome toggles and include/exclude keyword rules control which completions notify. Clicking a completion or pending reminder opens the originating session's conversation; system notification clicks also bring the DSH window forward. In-app banners are dismissible; test notifications only focus the window.
 
-No harness change is needed: the host contributes a session projection (a bounded summary of each session's last completed turn), and the client watches the session list's completion reminder and applies its own persisted preferences.
+No harness change is needed: the host contributes a session projection (a bounded summary of each session's last completed turn), and the client watches advances of that projection and applies its own persisted preferences. On DSH `0.2.0-rc.2`, pending notifications read `uiSession.sessionStatus`; legacy pending sources remain supported. Completion and pending reminders share the same window-aware routing, with main-view suppression only when `backgroundOnly` is on and the window is visible and focused. Turning it off keeps system notifications for all conversations in foreground and background.
 
 ```
 host:  notification projection (last turn's reason/text/tools) --session/projection--> browser
-client: session list completion reminder (live, dedup) + persisted settings
-        -> permission + current-session visibility gate
-        -> new Notification("DSH finished", { body: "deploy done" })
-        -> click: focus the window + open that session's conversation page
+client: notification projection turn advance + pending status + persisted settings
+        -> backgroundOnly ON: hidden/unfocused -> system notification (permission granted)
+                              visible + focused -> non-main conversation: top-center banner
+                                                   mainView conversation: no reminder
+        -> backgroundOnly OFF: system notification for any session (permission granted)
+        -> click: open that session's conversation page; system notification also focuses window
 ```
 
 ## Install
 
+Extract the local release into a permanent plugin directory, then install that directory:
+
 ```sh
-dsh plugin --profile web add https://github.com/omdsh-dev/dsh-notification/archive/refs/tags/v0.2.0.tar.gz
+dsh plugin --profile web add "file:/absolute/path/to/local-plugins/dsh-notification"
 ```
+
+The release includes the built host/client artifacts; no build or development dependency installation is needed in the extracted directory. See [INSTALL.zh-CN.md](<INSTALL.zh-CN.md>) for extraction and installation instructions. This local release is not an uploaded GitHub/npm release.
 
 Restart the web server so the host half and the served client bundle pick up the plugin. The default `dsh web` profile has the required client composition (the session list, the settings shell, locale, and the workspace navigation service).
 
-Version `0.2.0` still supports the 0.1.1 and 0.1.2 Harness client package layouts and projection contracts. Switching to the notification's session on click needs the Harness workspace navigation service (`uiWorkspace`), which 0.1.5-rc.1 and other builds providing that service expose; where it is missing the click degrades to focusing the window.
+Version `0.2.5` targets Harness `0.2.0-rc.2` and retains adapters for legacy client package layouts and pending sources. Switching to the notification's session on click needs the Harness workspace navigation service (`uiWorkspace`), which 0.1.5-rc.1 and other builds providing that service expose; where it is missing, system notification clicks still focus the window but session navigation is skipped for both reminder channels.
 
 The settings section lives under **Settings > Notifications**.
 
@@ -31,10 +37,23 @@ The settings section lives under **Settings > Notifications**.
 | Enable notifications | on | Master switch; off stops every notification while keeping rules. |
 | Notify on completed / error / aborted / blocked / token limit | completed + error on, rest off | Which turn-end reasons notify (the host projection reports the reason). |
 | Keyword rules | none | Include/exclude filters matched against the session title, the turn's reply text, and its tool names. Include rules: at least one must match. Exclude rules: a match suppresses. Rules support literal or regex matching with an optional case-sensitive flag. |
-| Require manual dismiss | off | The notification stays until dismissed. |
-| Only notify when the task is out of view | on | Suppress a notification only when its session is currently in view. A completion still notifies while the page is hidden or while another session/workspace is open. Turn it off to notify even for the session being watched. Notifications for the same session replace each other. |
+| Require manual dismiss | off | Disable automatic expiry for in-app banners (the five-banner cap still applies); request persistent system notifications (subject to browser/OS support). |
+| System notifications in background, in-app toasts in foreground | on | Route automatic completion and pending reminders by window state and main-view conversation, as below. Turn it off to use system notifications in both foreground and background, including the current conversation. |
 
-Preferences persist in the browser (localStorage). The section also grants browser permission and sends a test notification.
+After the other settings and rules allow a reminder:
+
+| `backgroundOnly` | Window state | Conversation | Reminder |
+| --- | --- | --- | --- |
+| on | Hidden or unfocused (`document.hidden === true` or `document.hasFocus() === false`) | Any, including the main view | System notification; granted browser permission required. |
+| on | Visible and focused | Open in the main view (`mainView`) | Suppressed. |
+| on | Visible and focused | Not open in the main view | Dismissible top-center in-app banner; no OS notification permission needed. Click to open that session. |
+| off | Foreground or background | Any, including the current conversation | System notification; granted browser permission required. |
+
+In-app banners are used only while `backgroundOnly` is on. They normally expire after 8 seconds; **Require manual dismiss** disables that expiry. Opening or dismissing a banner removes it. At most five banners are kept; an additional banner evicts the oldest, even with manual dismiss enabled.
+
+Manual test notifications always use the system channel and bypass this routing setting, but still require granted notification permission.
+
+Preferences persist in the browser (localStorage). Version `0.2.5` keeps the `dsh-notification.v4` settings key and all existing preference fields, including `backgroundOnly`, preserves existing preferences, and does not force a new switch value. The section also grants browser permission and sends a test notification.
 
 ## Configuration
 
@@ -59,26 +78,30 @@ Host-side tunables live on the plugin row in `cordis.yml`:
 ## Permission boundary
 
 - The host folds a pure projection over the session log (turn reason, bounded reply text, tool names) and the projection seam delivers it to the browser; the plugin writes nothing to the log and registers no model-facing tools.
-- The client watches the session list's completion reminder (a live "finished while not selected" edge the runtime already computes) and shows a notification only when the user has granted Notification permission.
+- The client watches the notification projection's completed-turn advances and pending-interaction status. Both use the routing above: system notifications require `Notification.permission === "granted"`; foreground in-app banners, available only with `backgroundOnly` on, do not require OS notification permission. The Harness's `completionUnread` reminder is not a completion event counter.
 - Rule matching runs client-side against the projected content; the reply body never exceeds `maxBodyChars`.
 
 ## Development
 
 ```sh
-pnpm install            # links the sibling dsh checkout for build and tests
+pnpm install --frozen-lockfile --store-dir node_modules/.cache/pnpm-store # pinned npm artifacts
 pnpm run check          # typecheck + tests + build
 pnpm run test           # vitest (host projection + composition, client decision/runner/helpers/section)
 pnpm run build          # esbuild host/client/invariant bundles + tsc declarations
 ```
 
-The repo expects the harness checkout at `../deepseek-harness` for the dev-time `link:` resolutions. The composition spec boots the real `SessionStore` and `SessionProjectionRegistry` and proves the fold.
+Development targets DSH `0.2.0-rc.2` (commit `639ed015397290b3745d163aafe02ffee4aa3f84`): DSH devDependencies use exact npm versions, with Cordis `4.0.4` and Schemastery `3.18.4`; no sibling checkout is required. The lockfile pins the installed dependency graph, while runtime peer ranges retain their compatibility policy. The composition spec boots the real `SessionStore` and `SessionProjectionRegistry` and proves the fold.
 
 ## Known limitations
 
-- Notifications require the page to be open (the browser shows them while it is hidden, but not after the tab is closed) and Notification permission granted; a denied site permission cannot be overridden from inside the page.
-- Notifications fire once per finished turn (a running→idle edge on any session); a completion that happened while the page was disconnected is not re-notified on reconnect.
+- Both reminder channels require a running client page. Only system notifications require granted Notification permission; foreground in-app banners work without it when `backgroundOnly` is on. Losing focus, minimizing, or closing a shell window to the tray can allow system notifications if the page/renderer keeps running. Quitting the app, closing a browser tab, or destroying the renderer stops all client reminders. A tray/background process alone does not prove that the renderer is still alive; a denied site permission cannot be overridden from inside the page.
+- Notifications fire once per finished turn (an advance of the host notification projection's turn number); a completion that happened while the page was disconnected is not re-notified on reconnect.
 - The rule subject is the session title plus the last turn's reply text and tool names — earlier turns are not matched.
-- Notification body is a flat text snippet. Clicking a completion or pending notification focuses the DSH window and opens the originating session's conversation page; the exact turn inside it is not deep-linked. When that session is no longer listed or the workspace navigation service is unavailable, the click degrades to focusing the window.
+- Reminder bodies are flat text snippets. Clicking a completion or pending reminder opens the originating session's conversation page; the exact turn inside it is not deep-linked. System notification clicks also focus the DSH window. If the session is no longer listed or the workspace navigation service is unavailable, navigation is skipped; system notification clicks still focus the window.
+
+## Plugin icon
+
+The packaged [icon](<assets/icon.svg>) uses the MIT-licensed [Tabler bell-ringing](https://tabler.io/icons/icon/bell-ringing), adapted to a blue rounded square with a white bell. It loads locally through the top-level `icon` field in [package.json](<package.json>), with no external image requests. See [attribution and license](<assets/README.md>).
 
 ## License
 

@@ -22,7 +22,7 @@ Standing orders for this repository. The product contract lives in [README.md](R
 ## Integration
 
 - The plugin mounts into a dsh profile via `dsh plugin --profile <name> add file:/path/to/dsh-notification` (bundle route). Its `dsh.bundle.patch` inserts one row; the profile's healed `node_modules` resolves the bare name.
-- No harness change is required: the host registers a session projection (a pure fold the projection seam delivers to every session), and the client persists its preferences in a local snapshot store and reads the session list's completion reminder.
+- No harness change is required: the host registers a session projection (a pure fold the projection seam delivers to every session), and the client persists its preferences in a local snapshot store and watches completed-turn projection advances plus pending-interaction status.
 - Host plugin-set changes take effect on server restart; client bundle changes are served from `lib/client.js` after a rebuild (page refresh).
-- The harness checkout that feeds type checking is the sibling `../deepseek-harness` (linked devDependencies). When that checkout moves to a new snapshot, re-run `pnpm install`, `pnpm run check`, and fix API drift before integrating.
+- Development and tests target npm DSH `0.2.0-rc.2` (commit `639ed015397290b3745d163aafe02ffee4aa3f84`), with exact devDependency versions, Cordis `4.0.4`, and Schemastery `3.18.4`; no sibling checkout links are used. Restore dependencies with `pnpm install --frozen-lockfile --store-dir node_modules/.cache/pnpm-store`. Changing the development target requires updating the manifest and lockfile, checking API drift, and re-running `pnpm run check`; runtime peer ranges remain a separate compatibility policy.
 
