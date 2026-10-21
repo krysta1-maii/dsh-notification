@@ -1,7 +1,8 @@
 {
   "name": "dsh-notification",
-  "description": "Browser desktop notifications when the DeepSeek Harness finishes a turn: configurable per-outcome toggles and include/exclude keyword rules, shown through the browser Notification API.",
-  "version": "0.2.0",
+  "description": "DeepSeek Harness completion and pending reminders with layered background system notifications and foreground in-app toasts, or system-only mode, plus per-outcome toggles and include/exclude keyword rules.",
+  "version": "0.2.5",
+  "icon": "assets/icon.svg",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -35,11 +36,13 @@
     }
   },
   "files": [
+    "assets",
     "lib",
     "cordis.patch.yml",
     "dsh.plugin.json",
     "README.md",
     "README.zh.md",
+    "INSTALL.zh-CN.md",
     "LICENSE"
   ],
   "scripts": {
