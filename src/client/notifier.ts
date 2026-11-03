@@ -54,6 +54,15 @@ export function notificationSurface(
 }
 
 /**
+ * The three tag prefixes are a frozen contract with the portable shell. The
+ * shell parses the longest prefix first, so `pending` and `test` both begin
+ * with the completion prefix and must be checked before it.
+ */
+export const NOTIFICATION_TAG_PREFIX = 'dsh-notification-'
+export const PENDING_NOTIFICATION_TAG_PREFIX = 'dsh-notification-pending-'
+export const TEST_NOTIFICATION_TAG_PREFIX = 'dsh-notification-test-'
+
+/**
  * The grouping tag: one notification slot per session per turn. Turn-scoped
  * (not session-scoped): the browser replaces same-tag notifications, and a
  * stale same-tag entry lingering in the Windows notification center silently
@@ -61,12 +70,21 @@ export function notificationSurface(
  * each completed turn's toast always shows.
  */
 export function notificationTag(sessionId: string, turn: number): string {
-  return `dsh-notification-${sessionId}-${turn}`
+  return `${NOTIFICATION_TAG_PREFIX}${sessionId}-${turn}`
 }
 
 /** A unique tag for each pending interaction notification in one session. */
 export function pendingNotificationTag(sessionId: string, sequence: number): string {
-  return `dsh-notification-pending-${sessionId}-${sequence}`
+  return `${PENDING_NOTIFICATION_TAG_PREFIX}${sessionId}-${sequence}`
+}
+
+/**
+ * A unique tag for each manual test notification. The timestamp keeps the
+ * browser and the shell from replacing an older toast with the same slot.
+ * @param stamp - digestable suffix, defaulting to the current time.
+ */
+export function testNotificationTag(stamp: number = Date.now()): string {
+  return `${TEST_NOTIFICATION_TAG_PREFIX}${stamp}`
 }
 
 /** The surface this code may show notifications on (absent in insecure contexts). */

@@ -205,6 +205,8 @@ function expectChannels(test: ReturnType<typeof fixture>, systemTags: string[], 
 beforeEach(() => {
   localStorage.clear()
   document.head.replaceChildren()
+  // Activation hashes persist in the jsdom window across tests.
+  window.history.replaceState(null, '', '/')
   StubNotification.instances = []
   StubNotification.permission = 'granted'
   vi.stubGlobal('Notification', StubNotification)
@@ -610,6 +612,8 @@ describe('dsh-notification client composition with npm DSH 0.2.2-alpha.3', () =>
   })
 
   it('uses live optional workspace navigation safely for both channels and dismisses activated toasts', async () => {
+    let clock = 1_000
+    vi.spyOn(Date, 'now').mockImplementation(() => clock)
     const test = fixture(true)
     await mountUiSession(test)
     const fiber = test.ctx.plugin(notificationPlugin)
@@ -635,6 +639,8 @@ describe('dsh-notification client composition with npm DSH 0.2.2-alpha.3', () =>
     expect(face.hooks.notifications.getSnapshot()).toEqual([])
     test.list.set(snapshot(true, 3))
     test.list.set(snapshot(false))
+    // Leave the shared 750 ms reveal window before the next user action.
+    clock += 750
     expect(() => face.activate('dsh-notification-session-a-3')).not.toThrow()
     expect(openSession).toHaveBeenCalledOnce()
     expect(face.hooks.notifications.getSnapshot()).toEqual([])
@@ -643,6 +649,7 @@ describe('dsh-notification client composition with npm DSH 0.2.2-alpha.3', () =>
     vi.mocked(document.hasFocus).mockReturnValue(false)
     test.list.set(snapshot(true, 4))
     expectChannels(test, ['dsh-notification-session-a-4'], [])
+    clock += 750
     expect(() => StubNotification.instances[0]?.onclick?.()).not.toThrow()
     expect(openSession).toHaveBeenCalledTimes(2)
     expect(openSession).toHaveBeenLastCalledWith('session-a')
@@ -652,6 +659,7 @@ describe('dsh-notification client composition with npm DSH 0.2.2-alpha.3', () =>
     test.list.set(snapshot(true, 4))
     vi.mocked(document.hasFocus).mockReturnValue(true)
     test.list.set(snapshot(true, 5))
+    clock += 750
     openSession.mockImplementation(() => { throw new Error('navigation unavailable') })
     expect(() => face.activate('dsh-notification-session-a-5')).not.toThrow()
     expect(face.hooks.notifications.getSnapshot()).toEqual([])
@@ -696,5 +704,35 @@ describe('dsh-notification client composition with npm DSH 0.2.2-alpha.3', () =>
     await sessionFiber.dispose()
     expect(test.listSubscriptions.size).toBe(0)
     expect(test.remoteSubscriptions.size).toBe(0)
+  })
+
+  it('opens the session named by a shell hash and clears it', async () => {
+    const test = fixture(true)
+    const openSession = vi.fn()
+    const workspaceFiber = test.ctx.plugin({
+      name: 'test.workspace',
+      apply: (scope: Cordis.Context) => { scope.provide('uiWorkspace', { openSession } as never) },
+    })
+    await workspaceFiber
+    window.location.hash = '#dsh-session=session-a&n=n-cold'
+    const fiber = test.ctx.plugin(notificationPlugin)
+    await fiber
+    await Promise.resolve()
+    expect(openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+    expect(window.location.hash).toBe('')
+    expect(window.location.pathname).toBe('/')
+    await fiber.dispose()
+    await workspaceFiber.dispose()
+  })
+
+  it('boots without uiWorkspace and leaves the shell hash in place', async () => {
+    const test = fixture(true)
+    window.location.hash = '#dsh-session=session-a&n=n-without-workspace'
+    const fiber = test.ctx.plugin(notificationPlugin)
+    await fiber
+    expect(test.slots.core.entries('settings.section')).toHaveLength(1)
+    expect(test.slots.core.entries('shell.overlay')).toHaveLength(1)
+    expect(window.location.hash).toBe('#dsh-session=session-a&n=n-without-workspace')
+    await fiber.dispose()
   })
 })

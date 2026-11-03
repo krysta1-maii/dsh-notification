@@ -20,6 +20,14 @@ export type NotificationSurface = 'system' | 'in-app' | 'none';
  */
 export declare function notificationSurface(permission: NotificationPermission, backgroundOnly: boolean, documentHidden: boolean, documentFocused: boolean, sessionInView: boolean): NotificationSurface;
 /**
+ * The three tag prefixes are a frozen contract with the portable shell. The
+ * shell parses the longest prefix first, so `pending` and `test` both begin
+ * with the completion prefix and must be checked before it.
+ */
+export declare const NOTIFICATION_TAG_PREFIX = "dsh-notification-";
+export declare const PENDING_NOTIFICATION_TAG_PREFIX = "dsh-notification-pending-";
+export declare const TEST_NOTIFICATION_TAG_PREFIX = "dsh-notification-test-";
+/**
  * The grouping tag: one notification slot per session per turn. Turn-scoped
  * (not session-scoped): the browser replaces same-tag notifications, and a
  * stale same-tag entry lingering in the Windows notification center silently
@@ -29,6 +37,12 @@ export declare function notificationSurface(permission: NotificationPermission, 
 export declare function notificationTag(sessionId: string, turn: number): string;
 /** A unique tag for each pending interaction notification in one session. */
 export declare function pendingNotificationTag(sessionId: string, sequence: number): string;
+/**
+ * A unique tag for each manual test notification. The timestamp keeps the
+ * browser and the shell from replacing an older toast with the same slot.
+ * @param stamp - digestable suffix, defaulting to the current time.
+ */
+export declare function testNotificationTag(stamp?: number): string;
 /** The surface this code may show notifications on (absent in insecure contexts). */
 export declare function notificationsApi(): typeof Notification | undefined;
 /** The result of asking the browser to construct one system notification. */

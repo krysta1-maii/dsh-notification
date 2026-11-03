@@ -23,6 +23,8 @@ interface WiringSummary {
 interface WiringSnapshot {
   readonly ids: readonly string[]
   readonly byId: Readonly<Record<string, WiringSummary>>
+  /** The real controller starts at `pending`; fixtures default to `ready`. */
+  readonly phase?: 'pending' | 'ready'
 }
 
 class StubNotification {
@@ -74,8 +76,10 @@ function bootstrap(initial: WiringSnapshot = { ids: [], byId: {} }) {
   const effects: Array<() => void> = []
   const events = new Map<string, Set<() => void>>()
   const lazy: Array<{ deps: string[]; callback: (scope: ClientContext) => unknown; off?: () => void }> = []
-  let snapshot = initial
+  let snapshot: WiringSnapshot = { phase: 'ready', ...initial }
+  const refresh = vi.fn(async (): Promise<void> => {})
   const sessions = {
+    refresh,
     list: {
       getSnapshot: (): WiringSnapshot => snapshot,
       subscribe: (listener: () => void): (() => void) => {
@@ -144,8 +148,8 @@ function bootstrap(initial: WiringSnapshot = { ids: [], byId: {} }) {
     return (entry as { inject: () => T }).inject()
   }
   return {
-    ctx, listeners, register, connect, disconnect, slot, dispose,
-    setSnapshot: (next: WiringSnapshot) => { snapshot = next },
+    ctx, listeners, register, connect, disconnect, slot, dispose, refresh,
+    setSnapshot: (next: WiringSnapshot) => { snapshot = { phase: 'ready', ...next } },
     tick: () => { for (const listener of [...listeners]) listener() },
     reset: () => { for (const listener of [...(events.get('connection/reset') ?? [])]) listener() },
   }
@@ -209,13 +213,47 @@ function automaticFixture(event: AutomaticEvent, facts: Partial<WiringSummary> =
 
 const focus = vi.fn()
 
+/** Browser globals the activation controller reads and writes. */
+const locationStub = { pathname: '/', search: '', hash: '' }
+const historyStub = {
+  replaceState: vi.fn((_state: unknown, _title: string, _url?: string) => { locationStub.hash = '' }),
+}
+const windowHandlers = new Map<string, Set<() => void>>()
+
+function dispatchWindowEvent(name: string): void {
+  for (const handler of [...(windowHandlers.get(name) ?? [])]) handler()
+}
+
+/** Model the shell's `location.hash = ...` write, including `hashchange`. */
+function setActivationHash(hash: string): void {
+  locationStub.hash = hash
+  dispatchWindowEvent('hashchange')
+}
+
 beforeEach(() => {
   vi.useFakeTimers()
   StubNotification.permission = 'granted'
   StubNotification.instances = []
   focus.mockReset()
+  locationStub.pathname = '/'
+  locationStub.search = ''
+  locationStub.hash = ''
+  historyStub.replaceState.mockClear()
+  windowHandlers.clear()
   vi.stubGlobal('Notification', StubNotification)
-  vi.stubGlobal('window', { focus })
+  vi.stubGlobal('window', {
+    focus,
+    location: locationStub,
+    history: historyStub,
+    addEventListener: (name: string, handler: () => void) => {
+      let handlers = windowHandlers.get(name)
+      if (handlers === undefined) windowHandlers.set(name, handlers = new Set())
+      handlers.add(handler)
+    },
+    removeEventListener: (name: string, handler: () => void) => {
+      windowHandlers.get(name)?.delete(handler)
+    },
+  })
   vi.stubGlobal('document', {
     hidden: true,
     hasFocus: () => true,
@@ -254,6 +292,128 @@ describe('notification click wiring', () => {
     fixture.setSnapshot({ ids: [], byId: {} })
     expect(() => StubNotification.instances[0]!.onclick?.()).not.toThrow()
     expect(openSession).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('portable shell hash activation', () => {
+  it('opens a session from a hash that predates uiWorkspace and clears it', () => {
+    const fixture = bootstrap({ ids: ['session-a'], byId: { 'session-a': completionSummary(1) } })
+    apply(fixture.ctx)
+    locationStub.pathname = '/app'
+    locationStub.search = '?profile=web'
+    locationStub.hash = '#dsh-session=session-a&n=n-cold'
+    const openSession = vi.fn()
+    fixture.connect('uiWorkspace', { openSession })
+    expect(openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+    expect(locationStub.hash).toBe('')
+    expect(historyStub.replaceState).toHaveBeenCalledWith(null, '', '/app?profile=web')
+  })
+
+  it('opens on a later hashchange and ignores a repeated nonce', () => {
+    const fixture = completionFixture()
+    setActivationHash('#dsh-session=session-a&n=n-hot')
+    expect(fixture.openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+    setActivationHash('#dsh-session=session-a&n=n-hot')
+    expect(fixture.openSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens once when a notification click and a hash coincide', () => {
+    const fixture = completionFixture()
+    setActivationHash('#dsh-session=session-a&n=n-both')
+    StubNotification.instances[0]!.onclick?.()
+    expect(fixture.openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+    expect(focus).toHaveBeenCalledTimes(1)
+  })
+
+  it('allows a deliberate reveal after the dedupe window', () => {
+    const fixture = completionFixture()
+    setActivationHash('#dsh-session=session-a&n=n-first')
+    StubNotification.instances[0]!.onclick?.()
+    expect(fixture.openSession).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(749)
+    StubNotification.instances[0]!.onclick?.()
+    expect(fixture.openSession).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(1)
+    StubNotification.instances[0]!.onclick?.()
+    expect(fixture.openSession).toHaveBeenCalledTimes(2)
+  })
+
+  it('refreshes once for an unlisted id, then opens it when the list catches up', () => {
+    const fixture = bootstrap({ ids: [], byId: {} })
+    apply(fixture.ctx)
+    const openSession = vi.fn()
+    fixture.connect('uiWorkspace', { openSession })
+    setActivationHash('#dsh-session=session-a&n=n-refresh')
+    expect(fixture.refresh).toHaveBeenCalledTimes(1)
+    expect(openSession).not.toHaveBeenCalled()
+    expect(locationStub.hash).toBe('#dsh-session=session-a&n=n-refresh')
+
+    fixture.setSnapshot({ ids: ['session-a'], byId: { 'session-a': completionSummary(1) } })
+    fixture.tick()
+    expect(fixture.refresh).toHaveBeenCalledTimes(1)
+    expect(openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+    expect(locationStub.hash).toBe('')
+  })
+
+  it('drops a pending hash at the 20 second deadline', () => {
+    const fixture = bootstrap({ ids: [], byId: {}, phase: 'pending' })
+    apply(fixture.ctx)
+    const openSession = vi.fn()
+    fixture.connect('uiWorkspace', { openSession })
+    setActivationHash('#dsh-session=session-a&n=n-slow')
+    expect(openSession).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(20_000)
+    expect(locationStub.hash).toBe('')
+    expect(openSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps the hash while uiWorkspace is absent and applies it on late activation', () => {
+    const hash = '#dsh-session=session-a&n=n-late'
+    const fixture = bootstrap({ ids: ['session-a'], byId: { 'session-a': completionSummary(1) } })
+    apply(fixture.ctx)
+    locationStub.hash = hash
+    expect(locationStub.hash).toBe(hash)
+    expect(fixture.register).toHaveBeenCalled()
+
+    const openSession = vi.fn()
+    fixture.connect('uiWorkspace', { openSession })
+    expect(openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+    expect(locationStub.hash).toBe('')
+  })
+
+  it('skips an archived target', () => {
+    const fixture = bootstrap({ ids: ['session-a'], byId: { 'session-a': completionSummary(1) } })
+    apply(fixture.ctx)
+    fixture.connect('workspaces', {
+      list: {
+        getSnapshot: () => ({ phase: 'ready', archivedSessionIds: ['session-a'] }),
+        subscribe: () => () => {},
+      },
+    })
+    const openSession = vi.fn()
+    fixture.connect('uiWorkspace', { openSession })
+    setActivationHash('#dsh-session=session-a&n=n-archived')
+    expect(openSession).not.toHaveBeenCalled()
+    expect(locationStub.hash).toBe('')
+  })
+
+  it('unsubscribes from hashchange when the workspace service leaves', () => {
+    const fixture = completionFixture()
+    fixture.disconnect('uiWorkspace')
+    setActivationHash('#dsh-session=session-a&n=n-gone')
+    expect(fixture.openSession).not.toHaveBeenCalled()
+    expect(locationStub.hash).toBe('#dsh-session=session-a&n=n-gone')
+
+    fixture.connect('uiWorkspace', { openSession: fixture.openSession })
+    expect(fixture.openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+  })
+
+  it('falls back to clearing the fragment when replaceState throws', () => {
+    const fixture = completionFixture()
+    historyStub.replaceState.mockImplementationOnce(() => { throw new Error('history is blocked') })
+    setActivationHash('#dsh-session=session-a&n=n-fallback')
+    expect(fixture.openSession).toHaveBeenCalledExactlyOnceWith('session-a')
+    expect(locationStub.hash).toBe('')
   })
 })
 

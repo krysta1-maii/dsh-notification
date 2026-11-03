@@ -6,10 +6,14 @@ import { describe, expect, it } from 'vitest'
 import {
   bodyText,
   createBrowserNotification,
+  NOTIFICATION_TAG_PREFIX,
   notificationSurface,
   notificationTag,
+  PENDING_NOTIFICATION_TAG_PREFIX,
   pendingNotificationTag,
   pendingTitleKey,
+  TEST_NOTIFICATION_TAG_PREFIX,
+  testNotificationTag,
   titleKey,
 } from '../src/client/notifier.ts'
 
@@ -69,11 +73,59 @@ describe('notificationTag', () => {
   it('namespaces the tag per session and turn', () => {
     expect(notificationTag('session-1', 3)).toBe('dsh-notification-session-1-3')
   })
+
+  it('matches the frozen portable-shell vector', () => {
+    const sessionId = 'session-123e4567-e89b-12d3-a456-426614174000'
+    expect(notificationTag(sessionId, 3))
+      .toBe('dsh-notification-session-123e4567-e89b-12d3-a456-426614174000-3')
+    expect(notificationTag(sessionId, 3)).toHaveLength(63)
+    expect(notificationTag(sessionId, 10)).toHaveLength(64)
+    expect(notificationTag(sessionId, 100)).toHaveLength(65)
+  })
 })
 
 describe('pendingNotificationTag', () => {
   it('keeps each pending interaction distinct', () => {
     expect(pendingNotificationTag('session-1', 2)).toBe('dsh-notification-pending-session-1-2')
+  })
+
+  it('matches the frozen portable-shell vector and always exceeds 64 characters', () => {
+    const sessionId = 'session-123e4567-e89b-12d3-a456-426614174000'
+    expect(pendingNotificationTag(sessionId, 2))
+      .toBe('dsh-notification-pending-session-123e4567-e89b-12d3-a456-426614174000-2')
+    expect(pendingNotificationTag(sessionId, 2)).toHaveLength(71)
+    expect(pendingNotificationTag(sessionId, 2).length).toBeGreaterThan(64)
+  })
+})
+
+describe('tag prefixes', () => {
+  it('lets the shell check the longest prefix first', () => {
+    expect(PENDING_NOTIFICATION_TAG_PREFIX).toBe('dsh-notification-pending-')
+    expect(TEST_NOTIFICATION_TAG_PREFIX).toBe('dsh-notification-test-')
+    expect(NOTIFICATION_TAG_PREFIX).toBe('dsh-notification-')
+    // Both longer prefixes start with the completion prefix, so completion must
+    // be matched last; the two longer prefixes do not shadow each other.
+    expect(PENDING_NOTIFICATION_TAG_PREFIX.startsWith(NOTIFICATION_TAG_PREFIX)).toBe(true)
+    expect(TEST_NOTIFICATION_TAG_PREFIX.startsWith(NOTIFICATION_TAG_PREFIX)).toBe(true)
+    expect(PENDING_NOTIFICATION_TAG_PREFIX.startsWith(TEST_NOTIFICATION_TAG_PREFIX)).toBe(false)
+    expect(TEST_NOTIFICATION_TAG_PREFIX.startsWith(PENDING_NOTIFICATION_TAG_PREFIX)).toBe(false)
+  })
+
+  it('builds each tag from its named prefix', () => {
+    expect(notificationTag('session-a', 1)).toBe(`${NOTIFICATION_TAG_PREFIX}session-a-1`)
+    expect(pendingNotificationTag('session-a', 1)).toBe(`${PENDING_NOTIFICATION_TAG_PREFIX}session-a-1`)
+    expect(testNotificationTag(123)).toBe(`${TEST_NOTIFICATION_TAG_PREFIX}123`)
+  })
+})
+
+describe('testNotificationTag', () => {
+  it('matches the frozen portable-shell vector', () => {
+    expect(testNotificationTag(1760000000000)).toBe('dsh-notification-test-1760000000000')
+    expect(testNotificationTag(1760000000000)).toHaveLength(35)
+  })
+
+  it('uses the current time by default and stays numeric', () => {
+    expect(testNotificationTag()).toMatch(/^dsh-notification-test-\d+$/)
   })
 })
 

@@ -23,6 +23,7 @@ import { createNotificationSettingsStore } from './store.ts'
 import { createInAppNotifications } from './in-app.ts'
 import { InAppNotifications, type InAppNotificationsInjected } from './InAppNotifications.tsx'
 import { activateNotificationTarget, type NotificationClickTarget } from './click.ts'
+import { createActivationController } from './deeplink.ts'
 import { notificationFor, pendingAdvance, pendingNotificationFor, projectionAdvance } from './runner.ts'
 import {
   bodyText,
@@ -30,6 +31,7 @@ import {
   notificationsApi,
   pendingTitleKey,
   notificationSurface,
+  testNotificationTag,
   type NotificationSurface,
   titleKey,
   type NotificationCreationResult,
@@ -38,14 +40,30 @@ import {
 /** Required services: the session list, slots, and locale. */
 export const inject = ['sessions', 'slots', 'locale']
 
+/** Repeated reveals of one session inside this window are the same user action. */
+const REVEAL_DEDUPE_MS = 750
+
 /** The slice of the sessions service this plugin reads. */
 interface SessionsListFace {
   readonly list: { getSnapshot(): NotificationSessionListState; subscribe(listener: () => void): () => void }
+  /** Host-authoritative list refresh; absent on older client builds. */
+  readonly refresh?: () => Promise<void>
 }
 
 /** The slice of the workspace navigation service this plugin reads. */
 interface UiWorkspaceFace {
   openSession(id: SessionId): void
+}
+
+/** The slice of the workspace state service used for the archived check. */
+interface WorkspacesFace {
+  readonly list: {
+    getSnapshot(): {
+      readonly phase: 'pending' | 'ready'
+      readonly archivedSessionIds: readonly string[]
+    }
+    subscribe(listener: () => void): () => void
+  }
 }
 
 type SessionId = string
@@ -62,10 +80,12 @@ interface NotificationSessionSummary {
   }
 }
 
-/** Minimal list snapshot consumed by the notification runners. */
+/** Minimal list snapshot consumed by the notification runners and activation. */
 interface NotificationSessionListState {
   readonly ids: readonly SessionId[]
   readonly byId: Readonly<Record<SessionId, NotificationSessionSummary>>
+  /** Arrival lifecycle: `ready` means the host list has answered at least once. */
+  readonly phase: 'pending' | 'ready'
 }
 
 /** The unified per-session status source this plugin reads. */
@@ -106,15 +126,6 @@ export function apply(ctx: ClientContext): void {
   // different `sessions` Context member, and the two collide in this
   // single-program build.
   const sessions = ctx.get('sessions') as unknown as SessionsListFace
-  // The workspace navigation service is optional and injected lazily (never in
-  // the exported `inject` list): web boot fails the whole entry while any
-  // required service stays pending. When it is absent the plugin still loads,
-  // and a click simply focuses the window.
-  let uiWorkspace: UiWorkspaceFace | undefined
-  ctx.inject(['uiWorkspace'], (scope) => {
-    uiWorkspace = scope.get('uiWorkspace') as unknown as UiWorkspaceFace | undefined
-    return () => { uiWorkspace = undefined }
-  })
   // Re-read the live list at click time: a session that was archived since the
   // notification appeared must not be opened (openSession throws on an unlisted
   // id, and the click handler must never throw).
@@ -131,15 +142,94 @@ export function apply(ctx: ClientContext): void {
   const requestPermission = (): Promise<NotificationPermission> =>
     notificationsApi()?.requestPermission() ?? Promise.resolve<NotificationPermission>('denied')
 
-  const activate = (target: NotificationClickTarget | undefined): void => {
-    window.focus()
+  // One reveal path for notifications and shell hand-offs: the 750 ms window
+  // keeps a hashchange and a notification click for the same session from
+  // opening it twice while still allowing a deliberate later click.
+  let lastReveal: { readonly sessionId: SessionId; readonly at: number } | undefined
+  const reveal = (target: NotificationClickTarget | undefined): void => {
+    if (target === undefined) return
     // Resolve navigation and list membership at click time, for both channels.
     const navigation = uiWorkspace
+    if (navigation === undefined) {
+      // A focus-only click must not consume the dedupe window: the workspace
+      // service can attach between this click and the next one.
+      activateNotificationTarget(target, { isListed, openSession: undefined, log })
+      return
+    }
+    const at = Date.now()
+    if (lastReveal !== undefined && lastReveal.sessionId === target.sessionId && at - lastReveal.at < REVEAL_DEDUPE_MS) {
+      log(`[dsh-notification] session ${target.sessionId} was opened moments ago; ignoring the duplicate reveal`)
+      return
+    }
+    lastReveal = { sessionId: target.sessionId, at }
     activateNotificationTarget(target, {
       isListed,
-      openSession: navigation === undefined ? undefined : navigation.openSession.bind(navigation),
+      openSession: navigation.openSession.bind(navigation),
       log,
     })
+  }
+
+  // Keep pathname and query; only the fragment carries the activation contract.
+  const clearActivationHash = (): void => {
+    try {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      log(`[dsh-notification] clearing the activation hash failed: ${message}; clearing the fragment instead`)
+      try {
+        window.location.hash = ''
+      } catch (fallback) {
+        log(`[dsh-notification] clearing the activation fragment also failed: ${String(fallback)}`)
+      }
+    }
+  }
+
+  // The workspace navigation service is optional and injected lazily (never in
+  // the exported `inject` list): web boot fails the whole entry while any
+  // required service stays pending. When it is absent the plugin still loads,
+  // and a click simply focuses the window.
+  let uiWorkspace: UiWorkspaceFace | undefined
+  ctx.inject(['uiWorkspace'], (scope) => {
+    const navigation = scope.get('uiWorkspace') as unknown as UiWorkspaceFace | undefined
+    uiWorkspace = navigation
+    if (navigation === undefined) {
+      return () => { uiWorkspace = undefined }
+    }
+    // uiWorkspace consumes workspaces, so the service is normally available
+    // here; a build without it simply skips the archived check.
+    const workspaceService = scope.get('workspaces') as unknown as WorkspacesFace | undefined
+    const workspaces = workspaceService?.list === undefined ? undefined : workspaceService
+    const readHash = (): string => window.location.hash
+    const refresh = sessions.refresh?.bind(sessions)
+    const controller = createActivationController({
+      readHash,
+      clearHash: clearActivationHash,
+      subscribeList: listener => sessions.list.subscribe(listener),
+      getList: () => sessions.list.getSnapshot(),
+      getWorkspaces: workspaces === undefined ? undefined : () => workspaces.list.getSnapshot(),
+      subscribeWorkspaces: workspaces === undefined ? undefined : listener => workspaces.list.subscribe(listener),
+      openSession: (id: SessionId): void => { reveal({ sessionId: id }) },
+      refresh,
+      now: () => Date.now(),
+      setTimer: (callback, ms) => setTimeout(callback, ms),
+      clearTimer: handle => { clearTimeout(handle as ReturnType<typeof setTimeout>) },
+      log,
+    })
+    // Register before the first read: a hash written while the callback runs is
+    // picked up by the event, and one written earlier is picked up here.
+    const onHash = (): void => { controller.handleHash(readHash()) }
+    window.addEventListener('hashchange', onHash)
+    onHash()
+    return () => {
+      window.removeEventListener('hashchange', onHash)
+      controller.dispose()
+      uiWorkspace = undefined
+    }
+  })
+
+  const activate = (target: NotificationClickTarget | undefined): void => {
+    window.focus()
+    reveal(target)
   }
   const inApp = createInAppNotifications(activate)
   ctx.effect(() => () => inApp.dispose(), 'dsh-notification: in-app notifications')
@@ -185,7 +275,7 @@ export function apply(ctx: ClientContext): void {
     // stale same-tag entry lingering in the Windows notification center silently
     // swallows every later notification with that tag. A fresh tag per test
     // guarantees the toast always shows.
-    return show(t('notify.testTitle'), t('notify.testBody'), `dsh-notification-test-${Date.now()}`, false)
+    return show(t('notify.testTitle'), t('notify.testBody'), testNotificationTag(), false)
   }
 
   // Completion runner: only advances past the highest observed turn notify.
