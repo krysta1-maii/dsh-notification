@@ -3,6 +3,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
+import { notificationIconUrl } from '../src/client/NotificationIcon.tsx'
 
 const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)))
 const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
@@ -17,6 +18,11 @@ describe('plugin icon metadata', () => {
     expect(local === '..' || local.startsWith('..' + sep)).toBe(false)
     expect(statSync(icon).isFile()).toBe(true)
     expect(statSync(icon).size).toBeLessThanOrEqual(256 * 1024)
+  })
+
+  it('publishes the icon as a client package asset', () => {
+    expect(manifest.exports['./assets/*']).toBe('./lib/assets/*')
+    expect(notificationIconUrl()).toBe('plugins/dsh-notification/assets/icon.svg')
   })
 
   it('ships the icon and its third-party license', () => {

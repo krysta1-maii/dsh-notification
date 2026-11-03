@@ -9,10 +9,15 @@
  * bundling schemastery (the Loader validates Config against the schema).
  */
 import { build } from 'esbuild'
-import { mkdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 
 mkdirSync('lib', { recursive: true })
+// The single icon source serves both the Host metadata field (assets/icon.svg)
+// and the browser package-asset route (lib/assets/icon.svg via exports).
+rmSync('lib/assets', { recursive: true, force: true })
+mkdirSync('lib/assets', { recursive: true })
+copyFileSync('assets/icon.svg', 'lib/assets/icon.svg')
 
 const dshExternal = ['@deepseek-ai/cordis', '@deepseek-ai/dsh-*']
 

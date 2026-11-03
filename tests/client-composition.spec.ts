@@ -83,6 +83,7 @@ class ShellSlots extends Cordis.Service {
       name: 'root',
       children: {
         'settings.section': { kind: 'list', scope: 'root' },
+        'settings.section.icon': { kind: 'list', scope: 'root', inline: true },
         'shell.overlay': { kind: 'list', scope: 'root' },
       },
     }, () => null), 'test shell: settings and overlay declarations')
@@ -220,7 +221,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-describe('dsh-notification client composition with npm DSH 0.2.0-rc.2', () => {
+describe('dsh-notification client composition with npm DSH 0.2.2-alpha.3', () => {
   it.each([false, true])('boots and registers settings with populated=%s', async populated => {
     const test = fixture(populated)
     const { uiSession, statusSubscriptions } = await mountUiSession(test)
@@ -233,7 +234,10 @@ describe('dsh-notification client composition with npm DSH 0.2.0-rc.2', () => {
     const fiber = test.ctx.plugin(notificationPlugin)
     await fiber
 
-    expect(registrations.mock.calls.map(([options]) => options.name)).toEqual(['settings.section', 'shell.overlay'])
+    expect(registrations.mock.calls.map(([options]) => options.name))
+      .toEqual(['settings.section', 'settings.section.icon', 'shell.overlay'])
+    expect(test.slots.core.entriesOfSlot('settings.section.icon').map(entry => entry.options.id))
+      .toEqual(['notification'])
     expect(test.slots.core.specDynamic('shell.overlay')).toEqual({ kind: 'list', scope: 'root' })
     const overlays = test.slots.core.entriesOfSlot('shell.overlay')
     expect(overlays.map(entry => entry.options.id)).toEqual(['test.other-overlay', 'notification.toasts'])
@@ -253,6 +257,7 @@ describe('dsh-notification client composition with npm DSH 0.2.0-rc.2', () => {
 
     await fiber.dispose()
     expect(test.slots.core.entries('settings.section')).toHaveLength(0)
+    expect(test.slots.core.entries('settings.section.icon')).toHaveLength(0)
     expect(statusSubscriptions.size).toBe(0)
     expect(test.listSubscriptions.size).toBe(baseline)
     expect(test.unregisterLocale).toHaveBeenCalledOnce()

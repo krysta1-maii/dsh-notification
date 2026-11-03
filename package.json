@@ -1,7 +1,7 @@
 {
   "name": "dsh-notification",
   "description": "DeepSeek Harness completion and pending reminders with layered background system notifications and foreground in-app toasts, or system-only mode, plus per-outcome toggles and include/exclude keyword rules.",
-  "version": "0.2.6",
+  "version": "0.7.7",
   "icon": "assets/icon.svg",
   "license": "MIT",
   "engines": {
@@ -18,6 +18,8 @@
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
+    "./assets/*": "./lib/assets/*",
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "dsh": {
@@ -37,6 +39,7 @@
   "files": [
     "assets",
     "lib",
+    "locale",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",

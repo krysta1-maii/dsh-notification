@@ -16,7 +16,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { NotificationSettings, PendingKind } from '../contract.ts'
 import { NotificationSettingsSection, type NotificationSectionInjected } from './SettingsSection.tsx'
-import { NS, en, zh } from './locales.ts'
+import { NotificationSectionIcon } from './NotificationIcon.tsx'
+import { DICTIONARIES, NS } from './locales.ts'
 import { adoptStyles } from './styles.ts'
 import { createNotificationSettingsStore } from './store.ts'
 import { createInAppNotifications } from './in-app.ts'
@@ -97,7 +98,7 @@ function asPendingKind(value: string | undefined): PendingKind | undefined {
 export function apply(ctx: ClientContext): void {
   adoptStyles()
   console.info('[dsh-notification] bundle loaded (completion and pending-interaction notifications, settings v4)')
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-notification: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, DICTIONARIES), 'dsh-notification: dictionaries')
 
   const t = ctx.locale.bind(NS)
   // The client sessions face is read through the service store, not the
@@ -320,6 +321,13 @@ export function apply(ctx: ClientContext): void {
       sendTest,
     }),
   }, NotificationSettingsSection))
+
+  // The navigation glyph for that section, addressed by the same id; the shell
+  // falls back to its own glyph when no icon registers.
+  slots.inject('settings.section.icon', () => slots.register({
+    name: 'settings.section.icon',
+    id: 'notification',
+  }, NotificationSectionIcon))
 
   // Native frame-wide, additive overlay: no separate DOM root or module dependency.
   slots.inject('shell.overlay', () => slots.register({

@@ -695,3 +695,13 @@ describe('pending source wiring', () => {
     expect(StubNotification.instances).toHaveLength(0)
   })
 })
+
+describe('settings contributions', () => {
+  it('registers the section page and its navigation icon under one id', () => {
+    const fixture = bootstrap()
+    apply(fixture.ctx)
+    const entries = fixture.register.mock.calls.map(([entry]) => entry as { name?: string; id?: string })
+    expect(entries).toContainEqual(expect.objectContaining({ name: 'settings.section', id: 'notification' }))
+    expect(entries).toContainEqual(expect.objectContaining({ name: 'settings.section.icon', id: 'notification' }))
+  })
+})

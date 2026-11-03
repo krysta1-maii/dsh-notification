@@ -17,6 +17,10 @@ export const cssText = `
   gap: 16px;
   min-width: 0;
 }
+.dsh_notification_navIcon {
+  display: block;
+  border-radius: 4px;
+}
 .dsh_notification_heading {
   display: flex;
   flex-direction: column;
