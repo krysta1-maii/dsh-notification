@@ -87,10 +87,10 @@ Host 侧可调参数在 `cordis.yml` 的插件行上：
 pnpm install --frozen-lockfile # 使用固定 npm 产物；store 路径已配置在项目内
 pnpm run check          # typecheck + tests + build
 pnpm run test           # vitest（host 投影 + 组合、client 判定/runner/辅助函数/设置段）
-pnpm run build          # esbuild host/client/invariant 打包 + tsc 声明
+pnpm run build          # esbuild host/client 打包 + tsc 声明
 ```
 
-开发依赖精确锁定 npm DSH `0.2.0-rc.2`（commit `639ed015397290b3745d163aafe02ffee4aa3f84`），Cordis 为 `4.0.4`，Schemastery 为 `3.18.4`，不再依赖同级源码仓库。锁文件固定安装图，运行时 peer 范围仍是独立的兼容策略。组合测试使用真实 `SessionStore`、`SessionProjectionRegistry` 与 `UiSession` 验证折叠、通知和生命周期。
+开发依赖精确锁定 npm DSH `0.2.2-alpha.3`（commit `05b1cae8db6e674c5685101494d4eec24652424a`），Cordis 为 `4.0.6-alpha.2`，Schemastery 为 `3.18.6-alpha.2`，不再依赖同级源码仓库。锁文件固定安装图；运行时支持范围由 `engines.dsh`（`>=0.2.2-0 <0.2.3`，覆盖整个 0.2.2 线）声明，宿主兼容门在加载插件前读取该字段。组合测试使用真实 `SessionStore`、`SessionProjectionRegistry` 与 `UiSession` 验证折叠、通知和生命周期。
 
 ## 已知限制
 

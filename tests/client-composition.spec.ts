@@ -36,7 +36,10 @@ type BundleRegistration = {
 /** Evaluate the shipped lazy-CJS handshake, not a mock or a Node-side substitute. */
 function loadUiSession(): typeof UiSessionType {
   const manifest = JSON.parse(readFileSync(require.resolve('@deepseek-ai/dsh-client-ui-session/package.json'), 'utf8'))
-  expect(manifest.version).toBe('0.2.0-rc.2')
+  // Follow the declared development target instead of restating its version here.
+  const target = JSON.parse(readFileSync(require.resolve('../package.json'), 'utf8'))
+    .devDependencies['@deepseek-ai/dsh-client-ui-session']
+  expect(manifest.version).toBe(target)
   const path = require.resolve('@deepseek-ai/dsh-client-ui-session/client')
   let registration: BundleRegistration | undefined
   runInNewContext(readFileSync(path, 'utf8'), {

@@ -35,11 +35,14 @@ export const Config = z.object({
 
 /**
  * Register the `notification` projection unit; the registration is an effect
- * on this plugin's fiber, so unloading removes the key.
+ * on this plugin's fiber, so unloading removes the key. Registration is
+ * awaited so a rejected unit (an incompatible `stateVersion` or a disposed
+ * fiber) fails the load instead of becoming an unhandled rejection; the
+ * returned handle is unused because the fiber owns the registration.
  * @param ctx - host cordis context.
  * @param config - validated plugin configuration (schema defaults applied).
  */
-export function apply(ctx: Context, config?: Config): void {
+export async function apply(ctx: Context, config?: Config): Promise<void> {
   const resolved: ResolvedConfig = Config(config ?? {})
-  ctx.sessionProjections.register(notificationProjection(resolved))
+  await ctx.sessionProjections.register(notificationProjection(resolved))
 }

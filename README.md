@@ -87,10 +87,10 @@ Host-side tunables live on the plugin row in `cordis.yml`:
 pnpm install --frozen-lockfile --store-dir node_modules/.cache/pnpm-store # pinned npm artifacts
 pnpm run check          # typecheck + tests + build
 pnpm run test           # vitest (host projection + composition, client decision/runner/helpers/section)
-pnpm run build          # esbuild host/client/invariant bundles + tsc declarations
+pnpm run build          # esbuild host/client bundles + tsc declarations
 ```
 
-Development targets DSH `0.2.0-rc.2` (commit `639ed015397290b3745d163aafe02ffee4aa3f84`): DSH devDependencies use exact npm versions, with Cordis `4.0.4` and Schemastery `3.18.4`; no sibling checkout is required. The lockfile pins the installed dependency graph, while runtime peer ranges retain their compatibility policy. The composition spec boots the real `SessionStore` and `SessionProjectionRegistry` and proves the fold.
+Development targets DSH `0.2.2-alpha.3` (commit `05b1cae8db6e674c5685101494d4eec24652424a`): DSH devDependencies use exact npm versions, with Cordis `4.0.6-alpha.2` and Schemastery `3.18.6-alpha.2`; no sibling checkout is required. The lockfile pins the installed dependency graph. Runtime support is declared by `engines.dsh` (`>=0.2.2-0 <0.2.3`, the whole 0.2.2 line), which the harness compatibility gate reads before loading the plugin. The composition spec boots the real `SessionStore` and `SessionProjectionRegistry` and proves the fold.
 
 ## Known limitations
 

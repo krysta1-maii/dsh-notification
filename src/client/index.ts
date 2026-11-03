@@ -49,15 +49,13 @@ interface UiWorkspaceFace {
 
 type SessionId = string
 
-/** Session list facts consumed across legacy and current Controllers. */
+/** Session list facts consumed by the notification runners. */
 interface NotificationSessionSummary {
   readonly id: SessionId
   readonly origin?: string
   readonly title?: string
   readonly displayTitle?: string
   readonly retainedBy?: Readonly<Record<string, number>>
-  /** 0.1.1 carries pending status on the row itself. */
-  readonly pendingInteraction?: PendingKind
   readonly projectionValues?: {
     readonly notification?: import('../contract.ts').NotificationProjectionValue
   }
@@ -67,31 +65,25 @@ interface NotificationSessionSummary {
 interface NotificationSessionListState {
   readonly ids: readonly SessionId[]
   readonly byId: Readonly<Record<SessionId, NotificationSessionSummary>>
-  readonly current?: SessionId
 }
 
-/** The current unified status source and the legacy pending-only source. */
+/** The unified per-session status source this plugin reads. */
 interface UiSessionFace {
   readonly sessionStatus?: {
     getSnapshot(): ReadonlyMap<SessionId, { readonly pendingInteraction?: { readonly kind: string } }>
     subscribe(listener: () => void): () => void
   }
-  readonly pendingInteractions?: {
-    getSnapshot(): ReadonlyMap<SessionId, { readonly kind: string }>
-    subscribe(listener: () => void): () => void
-  }
 }
 
-/** Slot registry surface common to the pre- and post-0.1.2 client assemblies. */
+/** The slot registry surface this plugin uses. */
 interface SlotsFace {
   inject(name: string, factory: () => unknown): unknown
   register(entry: object, component: unknown): unknown
 }
 
-/** Current Controllers label main-view retention; old Controllers expose current. */
+/** Main-view membership is the `mainView` reference source on the list row. */
 function isInView(state: NotificationSessionListState, id: SessionId): boolean {
-  const retainedBy = state.byId[id]?.retainedBy
-  return retainedBy === undefined ? state.current === id : (retainedBy.mainView ?? 0) > 0
+  return (state.byId[id]?.retainedBy?.mainView ?? 0) > 0
 }
 
 function asPendingKind(value: string | undefined): PendingKind | undefined {
@@ -253,15 +245,11 @@ export function apply(ctx: ClientContext): void {
     const observed = new Map<SessionId, { kind: PendingKind | undefined }>()
     const sequences = new Map<SessionId, number>()
     let uiSession: UiSessionFace | undefined
-    const pendingKind = (state: NotificationSessionListState, id: SessionId): PendingKind | undefined => {
-      const kind = uiSession?.sessionStatus === undefined
-        ? uiSession?.pendingInteractions?.getSnapshot().get(id)?.kind
-        : uiSession.sessionStatus.getSnapshot().get(id)?.pendingInteraction?.kind
-      return state.byId[id]?.pendingInteraction ?? asPendingKind(kind)
-    }
+    const pendingKind = (id: SessionId): PendingKind | undefined =>
+      asPendingKind(uiSession?.sessionStatus?.getSnapshot().get(id)?.pendingInteraction?.kind)
     const seed = (state: NotificationSessionListState): void => {
       const live = new Set(state.ids)
-      for (const id of state.ids) observed.set(id, { kind: pendingKind(state, id) })
+      for (const id of state.ids) observed.set(id, { kind: pendingKind(id) })
       for (const id of [...observed.keys()]) {
         if (!live.has(id)) {
           observed.delete(id)
@@ -281,7 +269,7 @@ export function apply(ctx: ClientContext): void {
       for (const id of state.ids) {
         const summary = state.byId[id]
         if (summary === undefined) continue
-        const kind = pendingKind(state, id)
+        const kind = pendingKind(id)
         const previous = observed.get(id)
         const next = pendingAdvance(previous, kind)
         observed.set(id, { kind: next.kind })
@@ -312,8 +300,7 @@ export function apply(ctx: ClientContext): void {
     ctx.inject(['uiSession'], (scope) => {
       uiSession = scope.get('uiSession') as unknown as UiSessionFace | undefined
       seed(sessions.list.getSnapshot())
-      const pendingSource = uiSession?.sessionStatus ?? uiSession?.pendingInteractions
-      const offPending = pendingSource?.subscribe(run)
+      const offPending = uiSession?.sessionStatus?.subscribe(run)
       return () => { offPending?.(); uiSession = undefined }
     })
     return () => { off(); stopReset() }

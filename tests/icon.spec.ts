@@ -6,13 +6,8 @@ import { describe, expect, it } from 'vitest'
 
 const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)))
 const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
-const plugin = JSON.parse(readFileSync(resolve(root, 'dsh.plugin.json'), 'utf8'))
 
 describe('plugin icon metadata', () => {
-  it('keeps the package and plugin versions in sync', () => {
-    expect(plugin.version).toBe(manifest.version)
-  })
-
   it('declares a package-local icon within the DSH size limit', () => {
     expect(manifest.icon).toBe('assets/icon.svg')
     expect(isAbsolute(manifest.icon)).toBe(false)

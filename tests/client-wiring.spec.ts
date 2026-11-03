@@ -1,5 +1,5 @@
 /**
- * Layered routing across legacy/current session data and live shell window state.
+ * Layered routing across session data and live shell window state.
  * Browser APIs and the context are small fixtures; the real UiSession contract
  * is exercised separately by the client composition spec.
  */
@@ -15,7 +15,6 @@ interface WiringSummary {
   readonly title?: string
   readonly displayTitle?: string
   readonly retainedBy?: Readonly<Record<string, number>>
-  readonly pendingInteraction?: 'approval' | 'question' | 'plan-review'
   readonly projectionValues?: {
     readonly notification?: { readonly turn: number; readonly reason: string; readonly body: string; readonly tools: readonly string[] }
   }
@@ -24,7 +23,6 @@ interface WiringSummary {
 interface WiringSnapshot {
   readonly ids: readonly string[]
   readonly byId: Readonly<Record<string, WiringSummary>>
-  readonly current?: string
 }
 
 class StubNotification {
@@ -156,9 +154,9 @@ function bootstrap(initial: WiringSnapshot = { ids: [], byId: {} }) {
 function completionFixture() {
   const fixture = bootstrap()
   apply(fixture.ctx)
-  fixture.setSnapshot({ ids: ['session-a'], byId: { 'session-a': completionSummary(0) }, current: 'session-b' })
+  fixture.setSnapshot({ ids: ['session-a'], byId: { 'session-a': completionSummary(0) } })
   fixture.tick()
-  fixture.setSnapshot({ ids: ['session-a'], byId: { 'session-a': completionSummary(1) }, current: 'session-b' })
+  fixture.setSnapshot({ ids: ['session-a'], byId: { 'session-a': completionSummary(1) } })
   fixture.tick()
   const openSession = vi.fn()
   fixture.connect('uiWorkspace', { openSession })
@@ -170,14 +168,12 @@ type AutomaticEvent = typeof automaticEvents[number]
 type Status = { pendingInteraction?: { kind: string } }
 
 /** Seed both runners, then expose equivalent fresh/repeated event operations. */
-function automaticFixture(event: AutomaticEvent, facts: Partial<WiringSummary> = { retainedBy: {} }, current?: string) {
+function automaticFixture(event: AutomaticEvent, facts: Partial<WiringSummary> = { retainedBy: {} }) {
   let turn = 0
   let row = facts
-  let selected = current
   const snapshot = (): WiringSnapshot => ({
     ids: ['session-a'],
     byId: { 'session-a': { ...completionSummary(turn), ...row } },
-    current: selected,
   })
   const fixture = bootstrap(snapshot())
   const status = observable<ReadonlyMap<string, Status>>(new Map())
@@ -203,9 +199,8 @@ function automaticFixture(event: AutomaticEvent, facts: Partial<WiringSummary> =
       fixture.tick()
       if (event === 'pending') status.set(new Map(status.getSnapshot()))
     },
-    select: (facts: Partial<WiringSummary>, current = selected) => {
+    select: (facts: Partial<WiringSummary>) => {
       row = facts
-      selected = current
       fixture.setSnapshot(snapshot())
       fixture.tick()
     },
@@ -263,20 +258,18 @@ describe('notification click wiring', () => {
 })
 
 describe.each(automaticEvents)('%s layered routing', event => {
-  const inViewCases: Array<{ label: string; facts: Partial<WiringSummary>; current?: string; count: number }> = [
-    { label: 'mainView=1 with no legacy current', facts: { retainedBy: { mainView: 1 } }, count: 0 },
-    { label: 'mainView=3 despite stale current elsewhere', facts: { retainedBy: { mainView: 3, sidebar: 1 } }, current: 'session-b', count: 0 },
-    { label: 'mainView=0 despite stale current matching', facts: { retainedBy: { mainView: 0 } }, current: 'session-a', count: 1 },
-    { label: 'sidebar retention despite stale current matching', facts: { retainedBy: { sidebar: 2 } }, current: 'session-a', count: 1 },
-    { label: 'empty retainedBy despite stale current matching', facts: { retainedBy: {} }, current: 'session-a', count: 1 },
-    { label: 'legacy current matching when retainedBy is absent', facts: { retainedBy: undefined }, current: 'session-a', count: 0 },
-    { label: 'legacy current elsewhere when retainedBy is absent', facts: { retainedBy: undefined }, current: 'session-b', count: 1 },
-    { label: 'legacy current absent when retainedBy is absent', facts: { retainedBy: undefined }, count: 1 },
+  const inViewCases: Array<{ label: string; facts: Partial<WiringSummary>; count: number }> = [
+    { label: 'mainView=1', facts: { retainedBy: { mainView: 1 } }, count: 0 },
+    { label: 'mainView=3 with another source', facts: { retainedBy: { mainView: 3, sidebar: 1 } }, count: 0 },
+    { label: 'mainView=0', facts: { retainedBy: { mainView: 0 } }, count: 1 },
+    { label: 'sidebar retention only', facts: { retainedBy: { sidebar: 2 } }, count: 1 },
+    { label: 'empty retainedBy', facts: { retainedBy: {} }, count: 1 },
+    { label: 'absent retainedBy', facts: { retainedBy: undefined }, count: 1 },
   ]
 
-  it.each(inViewCases)('routes a foreground event using $label', ({ facts, current, count }) => {
+  it.each(inViewCases)('routes a foreground event using $label', ({ facts, count }) => {
     Object.assign(document, { hidden: false, hasFocus: () => true })
-    const fixture = automaticFixture(event, facts, current)
+    const fixture = automaticFixture(event, facts)
     fixture.advance()
     expect(fixture.reminders()).toHaveLength(count)
     expect(StubNotification.instances).toHaveLength(0)
@@ -676,7 +669,7 @@ describe('pending source wiring', () => {
 
   it('notifies a still-selected session when the visible shell is unfocused', () => {
     Object.assign(document, { hidden: false, hasFocus: () => false })
-    const fixture = bootstrap({ ids: ['session-a'], byId: { 'session-a': { ...row, retainedBy: { mainView: 1 } } }, current: 'session-a' })
+    const fixture = bootstrap({ ids: ['session-a'], byId: { 'session-a': { ...row, retainedBy: { mainView: 1 } } } })
     const status = observable<ReadonlyMap<string, Status>>(new Map())
     fixture.connect('uiSession', { sessionStatus: status })
     apply(fixture.ctx)
@@ -684,34 +677,21 @@ describe('pending source wiring', () => {
     expect(StubNotification.instances).toHaveLength(1)
   })
 
-  it('uses unified status rather than a stale legacy pending source', () => {
+  it('subscribes only to the unified session status source', () => {
     const fixture = bootstrap(initial)
     const status = observable<ReadonlyMap<string, Status>>(new Map())
-    const legacy = observable<ReadonlyMap<string, { kind: string }>>(new Map([['session-a', { kind: 'question' }]]))
-    fixture.connect('uiSession', { sessionStatus: status, pendingInteractions: legacy })
+    fixture.connect('uiSession', { sessionStatus: status })
     apply(fixture.ctx)
     expect(status.listeners.size).toBe(1)
-    expect(legacy.listeners.size).toBe(0)
     status.set(new Map([['session-a', { pendingInteraction: { kind: 'question' } }]]))
     expect(StubNotification.instances).toHaveLength(1)
   })
 
-  it('keeps legacy pendingInteractions support', () => {
-    const fixture = bootstrap(initial)
-    const pending = observable<ReadonlyMap<string, { kind: string }>>(new Map())
-    fixture.connect('uiSession', { pendingInteractions: pending })
-    apply(fixture.ctx)
-    pending.set(new Map([['session-a', { kind: 'question' }]]))
-    expect(StubNotification.instances).toHaveLength(1)
-    fixture.dispose()
-    expect(pending.listeners.size).toBe(0)
-  })
-
-  it('keeps legacy row-level pending interactions without uiSession', () => {
+  it('does not notify row-level pending state without uiSession', () => {
     const fixture = bootstrap(initial)
     apply(fixture.ctx)
-    fixture.setSnapshot({ ids: ['session-a'], byId: { 'session-a': { ...row, pendingInteraction: 'approval' } } })
+    fixture.setSnapshot({ ids: ['session-a'], byId: { 'session-a': { ...row } } })
     fixture.tick()
-    expect(StubNotification.instances).toHaveLength(1)
+    expect(StubNotification.instances).toHaveLength(0)
   })
 })

@@ -95,8 +95,4 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
     notification: NotificationProjectionValue
   }
-
-  interface SessionProjectionStateMap {
-    notification: NotificationProjectionState
-  }
 }
