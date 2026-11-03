@@ -1,8 +1,8 @@
 # dsh-notification
 
-DeepSeek Harness Web GUI 的任务完成与等待交互提醒插件。默认（`backgroundOnly` 开启时）在窗口隐藏或失焦时，通过系统 `Notification` API 提醒所有会话；窗口可见且有焦点时，仅为不在主视图中打开的会话显示顶部居中的紧凑横向应用内横幅，沿用 DSH 原生视觉风格，而非右下角卡片。按结束状态开关 + 关键词包含/排除规则，精确控制哪些完成要提醒。点击完成或等待交互的提醒可打开对应会话的对话页；点击系统通知还会把 DSH 窗口带到前台。应用内提醒可手动关闭；测试通知仅聚焦窗口。
+DeepSeek Harness Web GUI 的任务完成与等待交互提醒插件。默认（`backgroundOnly` 开启时）在窗口隐藏或失焦时，通过系统 `Notification` API 提醒所有会话；窗口可见且有焦点时，仅为不在主视图中打开的会话显示顶部居中的紧凑横向应用内横幅，沿用 DSH 原生视觉风格，而非右下角卡片。按结束状态开关 + 关键词包含/排除规则，精确控制哪些完成要提醒。点击完成或等待交互的提醒可打开对应会话的对话页；点击系统通知还会把 DSH 窗口带到前台。应用内提醒可手动关闭；测试通知仅聚焦窗口。便携壳体还可以通过 hash 把原生 toast 的点击交回页面，插件等待会话列表就绪后打开目标并清除 hash。
 
-**无需改动 harness**：host 侧贡献一个会话投影（每个会话最近完成一轮的有界摘要），client 侧监听该投影的轮次增长，并应用自己持久化的偏好设置。在 DSH `0.2.0-rc.2` 中，等待通知使用 `uiSession.sessionStatus`，旧版 pending 接口仍保留回退。完成与等待交互提醒共用同一套窗口分层路由，只有 `backgroundOnly` 开启且窗口可见、有焦点时才抑制主视图会话的提醒。关闭此项后，前后台所有会话都使用系统通知。
+**无需改动 harness**：host 侧贡献一个会话投影（每个会话最近完成一轮的有界摘要），client 侧监听该投影的轮次增长，并应用自己持久化的偏好设置。在 DSH `0.2.2-alpha.3` 中，等待通知使用 `uiSession.sessionStatus`，旧版 pending 接口仍保留回退。完成与等待交互提醒共用同一套窗口分层路由，只有 `backgroundOnly` 开启且窗口可见、有焦点时才抑制主视图会话的提醒。关闭此项后，前后台所有会话都使用系统通知。
 
 ```
 host:   notification 投影（最近一轮的原因/正文/工具名） --session/projection--> 浏览器
@@ -26,9 +26,15 @@ dsh plugin --profile web add "file:/absolute/path/to/local-plugins/dsh-notificat
 
 随后重启 web 服务以加载 host 半部分与新的 client bundle。默认的 `dsh web` profile 已包含所需 client 组合（会话列表、设置外壳、locale 及工作区导航服务）。
 
-`0.2.5` 目标仍为 Harness `0.2.0-rc.2`，并保留旧版客户端包结构与等待状态的适配。点击通知切换会话需要 Harness 提供工作区导航服务（`uiWorkspace`，0.1.5-rc.1 及提供该服务的版本均具备）；缺失时两种提醒都跳过会话跳转，系统通知点击仍会聚焦窗口。
+`0.8.0` 目标为 Harness `0.2.2-alpha.3`，并保留旧版客户端包结构与等待状态的适配。点击通知切换会话需要 Harness 提供工作区导航服务（`uiWorkspace`，0.1.5-rc.1 及提供该服务的版本均具备）；缺失时两种提醒都跳过会话跳转，系统通知点击仍会聚焦窗口。
 
 设置段位于 **设置 > 通知**。
+
+## 便携壳体激活
+
+桌面壳体若用原生 toast 展示 DSH 通知，可以在用户点击后把目标交回页面。契约是一段由 `location.hash = '#dsh-session=<id>&n=<nonce>'` 写入的 fragment；插件在工作区服务挂载时读取一次，并在之后的每次 `hashchange` 读取。它等待会话列表进入 `ready` 且包含目标 id，在 id 缺失时请求一次 host 刷新，在 workspaces 服务可用时等待归档集合就绪，然后通过 `uiWorkspace.openSession` 打开会话。成功后用 `history.replaceState` 清除 fragment，保留 pathname 与 query。
+
+控制器在 20 秒后放弃，跳过已归档会话，忽略重复 nonce，连续 hash 只保留最新目标。同一会话在 750 毫秒内的重复打开视为同一次用户操作，因此 hash 与通知点击同时发生时只打开一次。缺少 `uiWorkspace` 时插件仍正常加载，hash 原样保留。解析契约、Windows Tag 哈希、启动 URI 与测试向量见[便携壳体接口说明](<docs/portable-shell-interface.md>)与[0.8.0 升级施工计划](<docs/upgrade-0.8.0-portable-activation.md>)。
 
 ## 设置
 
@@ -53,7 +59,7 @@ dsh plugin --profile web add "file:/absolute/path/to/local-plugins/dsh-notificat
 
 手动测试始终使用系统通知，绕过此路由设置，但仍须已授予通知权限。
 
-偏好保存在浏览器（localStorage）。`0.2.5` 保持 `dsh-notification.v4` 设置键与所有已有偏好字段（包括 `backgroundOnly`）不变，保留已有偏好，不强制重设开关。设置段内还可授予浏览器权限并发送测试通知。
+偏好保存在浏览器（localStorage）。`0.8.0` 保持 `dsh-notification.v4` 设置键与所有已有偏好字段（包括 `backgroundOnly`）不变，保留已有偏好，不强制重设开关。设置段内还可授予浏览器权限并发送测试通知。
 
 ## 配置
 
@@ -97,7 +103,7 @@ pnpm run build          # esbuild host/client 打包 + tsc 声明
 - 两种提醒都要求客户端页面仍在运行。只有系统通知需要已授予 Notification 权限，`backgroundOnly` 开启时的前台应用内提醒无需该权限。窗口失焦、最小化或壳窗口关闭到托盘后，只要页面/renderer 仍运行就可发送系统通知；退出程序、关闭浏览器标签页或销毁 renderer 后，两种客户端提醒都无法继续。仅有托盘/后台进程不能证明 renderer 仍存活；站点权限被拒后无法从页面内恢复。
 - 通知在每轮结束（host notification 投影的轮次号增长）触发一次；断线期间完成的轮次在重连后不会补发。
 - 规则匹配对象为会话标题 + 最近一轮的回复文本与工具名，不匹配更早的轮次。
-- 提醒正文是纯文本摘要。点击完成或等待交互的提醒会打开对应会话的对话页，不深链到具体轮次；点击系统通知还会聚焦 DSH 窗口。当会话已不在列表中或工作区导航服务不可用时，会话跳转会被跳过，系统通知点击仍会聚焦窗口。
+- 提醒正文是纯文本摘要。点击完成或等待交互的提醒会打开对应会话的对话页，不深链到具体轮次；点击系统通知还会聚焦 DSH 窗口。当会话已不在列表中或工作区导航服务不可用时，会话跳转会被跳过，系统通知点击仍会聚焦窗口。壳体交来的目标若始终未出现在列表中，20 秒后过期并只清除 fragment。
 
 ## 插件图标
 

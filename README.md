@@ -1,8 +1,8 @@
 # dsh-notification
 
-Completion and pending-interaction reminders for the DeepSeek Harness web GUI. By default (`backgroundOnly` on), a hidden or unfocused window uses system notifications (via the `Notification` API) for any session; a visible, focused window shows top-center compact horizontal in-app banners only for conversations outside the main view. These follow DSH's native visual style, not a bottom-right card layout. Per-outcome toggles and include/exclude keyword rules control which completions notify. Clicking a completion or pending reminder opens the originating session's conversation; system notification clicks also bring the DSH window forward. In-app banners are dismissible; test notifications only focus the window.
+Completion and pending-interaction reminders for the DeepSeek Harness web GUI. By default (`backgroundOnly` on), a hidden or unfocused window uses system notifications (via the `Notification` API) for any session; a visible, focused window shows top-center compact horizontal in-app banners only for conversations outside the main view. These follow DSH's native visual style, not a bottom-right card layout. Per-outcome toggles and include/exclude keyword rules control which completions notify. Clicking a completion or pending reminder opens the originating session's conversation; system notification clicks also bring the DSH window forward. In-app banners are dismissible; test notifications only focus the window. A portable shell can also hand a native toast click back to the page through a hash; the plugin waits for the session list, opens the target, and clears the hash.
 
-No harness change is needed: the host contributes a session projection (a bounded summary of each session's last completed turn), and the client watches advances of that projection and applies its own persisted preferences. On DSH `0.2.0-rc.2`, pending notifications read `uiSession.sessionStatus`; legacy pending sources remain supported. Completion and pending reminders share the same window-aware routing, with main-view suppression only when `backgroundOnly` is on and the window is visible and focused. Turning it off keeps system notifications for all conversations in foreground and background.
+No harness change is needed: the host contributes a session projection (a bounded summary of each session's last completed turn), and the client watches advances of that projection and applies its own persisted preferences. On DSH `0.2.2-alpha.3`, pending notifications read `uiSession.sessionStatus`; legacy pending sources remain supported. Completion and pending reminders share the same window-aware routing, with main-view suppression only when `backgroundOnly` is on and the window is visible and focused. Turning it off keeps system notifications for all conversations in foreground and background.
 
 ```
 host:  notification projection (last turn's reason/text/tools) --session/projection--> browser
@@ -26,9 +26,15 @@ The release includes the built host/client artifacts; no build or development de
 
 Restart the web server so the host half and the served client bundle pick up the plugin. The default `dsh web` profile has the required client composition (the session list, the settings shell, locale, and the workspace navigation service).
 
-Version `0.2.5` targets Harness `0.2.0-rc.2` and retains adapters for legacy client package layouts and pending sources. Switching to the notification's session on click needs the Harness workspace navigation service (`uiWorkspace`), which 0.1.5-rc.1 and other builds providing that service expose; where it is missing, system notification clicks still focus the window but session navigation is skipped for both reminder channels.
+Version `0.8.0` targets Harness `0.2.2-alpha.3` and retains adapters for legacy client package layouts and pending sources. Switching to the notification's session on click needs the Harness workspace navigation service (`uiWorkspace`), which 0.1.5-rc.1 and other builds providing that service expose; where it is missing, system notification clicks still focus the window but session navigation is skipped for both reminder channels.
 
 The settings section lives under **Settings > Notifications**.
+
+## Portable shell activation
+
+A desktop shell that shows DSH notifications natively can hand a toast click back to the page. The contract is a fragment written with `location.hash = '#dsh-session=<id>&n=<nonce>'`; the plugin reads it when the workspace service attaches and on every later `hashchange`. It waits for the session list to report `ready` and to contain the id, asks for one host refresh when the id is missing, waits for the workspace archive set when that service is present, and then opens the session through `uiWorkspace.openSession`. On success the fragment is removed with `history.replaceState`, preserving the pathname and query.
+
+The controller gives up after 20 seconds, skips sessions that are archived, ignores a repeated nonce, and keeps only the newest of consecutive hashes. A reveal within 750 ms of the previous reveal of the same session is treated as the same user action, so a hash and a notification click do not open twice. Without `uiWorkspace` the plugin still loads and the fragment is left untouched. The parsing contract, Windows tag hashing, launch URI, and test vectors are documented in [the portable shell interface](<docs/portable-shell-interface.md>) and [the 0.8.0 upgrade plan](<docs/upgrade-0.8.0-portable-activation.md>).
 
 ## Settings
 
@@ -53,7 +59,7 @@ In-app banners are used only while `backgroundOnly` is on. They normally expire 
 
 Manual test notifications always use the system channel and bypass this routing setting, but still require granted notification permission.
 
-Preferences persist in the browser (localStorage). Version `0.2.5` keeps the `dsh-notification.v4` settings key and all existing preference fields, including `backgroundOnly`, preserves existing preferences, and does not force a new switch value. The section also grants browser permission and sends a test notification.
+Preferences persist in the browser (localStorage). Version `0.8.0` keeps the `dsh-notification.v4` settings key and all existing preference fields, including `backgroundOnly`, preserves existing preferences, and does not force a new switch value. The section also grants browser permission and sends a test notification.
 
 ## Configuration
 
@@ -97,7 +103,7 @@ Development targets DSH `0.2.2-alpha.3` (commit `05b1cae8db6e674c5685101494d4eec
 - Both reminder channels require a running client page. Only system notifications require granted Notification permission; foreground in-app banners work without it when `backgroundOnly` is on. Losing focus, minimizing, or closing a shell window to the tray can allow system notifications if the page/renderer keeps running. Quitting the app, closing a browser tab, or destroying the renderer stops all client reminders. A tray/background process alone does not prove that the renderer is still alive; a denied site permission cannot be overridden from inside the page.
 - Notifications fire once per finished turn (an advance of the host notification projection's turn number); a completion that happened while the page was disconnected is not re-notified on reconnect.
 - The rule subject is the session title plus the last turn's reply text and tool names — earlier turns are not matched.
-- Reminder bodies are flat text snippets. Clicking a completion or pending reminder opens the originating session's conversation page; the exact turn inside it is not deep-linked. System notification clicks also focus the DSH window. If the session is no longer listed or the workspace navigation service is unavailable, navigation is skipped; system notification clicks still focus the window.
+- Reminder bodies are flat text snippets. Clicking a completion or pending reminder opens the originating session's conversation page; the exact turn inside it is not deep-linked. System notification clicks also focus the DSH window. If the session is no longer listed or the workspace navigation service is unavailable, navigation is skipped; system notification clicks still focus the window. A shell hand-off that never sees its id listed expires after 20 seconds and only clears the fragment.
 
 ## Plugin icon
 
