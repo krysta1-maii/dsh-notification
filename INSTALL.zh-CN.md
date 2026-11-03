@@ -19,14 +19,16 @@ tar -xzf /path/to/dsh-notification-0.8.0.tgz -C "$PLUGIN_DIR" --strip-components
 ## 2. 安装到现有 web profile
 
 ```sh
-dsh plugin --profile web add "file:/absolute/path/to/local-plugins/dsh-notification"
+dsh plugin --profile web add "link:/absolute/path/to/local-plugins/dsh-notification"
 ```
 
 传入的是包含 [package.json](<package.json>) 的目录，且应使用 DSH 运行环境能访问的绝对路径。若在 WSL 中运行 DSH，使用 Linux/WSL 路径，而不是 Windows 的 `C:\...` 路径。
 
+推荐使用 `link:`。pnpm 会在 profile 的 `node_modules/dsh-notification` 建立指向该目录的符号链接，后续替换 `lib/` 后无需重新安装，刷新页面或等待 HMR 即可加载新的 client bundle。`file:` 也能安装，但 pnpm 会复制一份产物，之后每次更新都要把文件复制进副本并重新链接，因此不建议用于持续开发。
+
 ## 3. 让现有实例生效
 
-安装会修改 `web` profile 的插件选择。请在方便时重启原有 DSH Web 服务，再刷新原有 Web 页面；无需另开一个替代服务器。当前会话正在运行时不要贸然重启。
+安装会修改 `web` profile 的插件选择。host 侧代码或插件行变化后，请在方便时重启原有 DSH Web 服务；仅 client bundle 变化时会由 HMR 轮询或页面刷新加载，无需重启。无需另开一个替代服务器；当前会话正在运行时不要贸然重启。
 
 在 Settings > Notifications 中可授予浏览器通知权限并发送测试通知。手动测试始终使用系统通知，绕过自动提醒的路由设置；系统弹窗仍要求已授权，并受浏览器站点权限和操作系统通知设置影响。应用内提醒不需要系统通知权限。
 

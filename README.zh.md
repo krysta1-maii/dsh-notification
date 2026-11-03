@@ -19,12 +19,12 @@ client: notification 投影轮次增长 + 等待状态 + 持久化设置
 将本地发布包解压到固定插件目录，再安装该目录：
 
 ```sh
-dsh plugin --profile web add "file:/absolute/path/to/local-plugins/dsh-notification"
+dsh plugin --profile web add "link:/absolute/path/to/local-plugins/dsh-notification"
 ```
 
 包内已包含构建产物，解压目录无需安装开发依赖或重新构建。详见 [INSTALL.zh-CN.md](<INSTALL.zh-CN.md>)。本次为本地发布包，未上传 npm/GitHub。
 
-随后重启 web 服务以加载 host 半部分与新的 client bundle。默认的 `dsh web` profile 已包含所需 client 组合（会话列表、设置外壳、locale 及工作区导航服务）。
+`link:` 模式让 `node_modules/dsh-notification` 始终指向解压目录，重建 `lib/` 后无需再次复制或重装插件。`file:` 模式也能安装，但 pnpm 会生成一份副本，之后的构建必须复制进副本并重新链接。默认的 `dsh web` profile 已包含所需 client 组合（会话列表、设置外壳、locale 及工作区导航服务）；host 改动需要重启 web 服务，仅 client 改动只需 HMR 或刷新页面。
 
 `0.8.0` 目标为 Harness `0.2.2-alpha.3`，并保留旧版客户端包结构与等待状态的适配。点击通知切换会话需要 Harness 提供工作区导航服务（`uiWorkspace`，0.1.5-rc.1 及提供该服务的版本均具备）；缺失时两种提醒都跳过会话跳转，系统通知点击仍会聚焦窗口。
 

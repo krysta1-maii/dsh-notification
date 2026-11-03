@@ -21,8 +21,8 @@ Standing orders for this repository. The product contract lives in [README.md](R
 
 ## Integration
 
-- The plugin mounts into a dsh profile via `dsh plugin --profile <name> add file:/path/to/dsh-notification` (bundle route). Its `dsh.bundle.patch` inserts one row; the profile's healed `node_modules` resolves the bare name.
+- The plugin mounts into a dsh profile via `dsh plugin --profile <name> add link:/path/to/dsh-notification` (bundle route). Its `dsh.bundle.patch` inserts one row; pnpm keeps `node_modules/dsh-notification` as a symlink to that directory, so a rebuilt `lib/` becomes visible without recopying or reinstalling. The `file:` form also works, but pnpm materializes a copy and later builds must be copied into the install directory and relinked.
 - No harness change is required: the host registers a session projection (a pure fold the projection seam delivers to every session), and the client persists its preferences in a local snapshot store and watches completed-turn projection advances plus pending-interaction status.
-- Host plugin-set changes take effect on server restart; client bundle changes are served from `lib/client.js` after a rebuild (page refresh).
+- Host plugin-set changes take effect on server restart; client bundle changes are served from `lib/client.js` after a rebuild (HMR or a page refresh).
 - Development and tests target npm DSH `0.2.2-alpha.3` (commit `05b1cae8db6e674c5685101494d4eec24652424a`), with exact devDependency versions, Cordis `4.0.6-alpha.2`, and Schemastery `3.18.6-alpha.2`; no sibling checkout links are used. Restore dependencies with `pnpm install --frozen-lockfile --store-dir node_modules/.cache/pnpm-store`. The package declares its supported runtime through `engines.dsh` (`>=0.2.2-0 <0.2.3`, the whole 0.2.2 line); the harness compatibility gate reads that field alone, so peer ranges stay `*`. Changing the development target requires updating the manifest, `engines.dsh`, and the lockfile, checking API drift, and re-running `pnpm run check`.
 

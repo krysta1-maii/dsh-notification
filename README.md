@@ -19,12 +19,12 @@ client: notification projection turn advance + pending status + persisted settin
 Extract the local release into a permanent plugin directory, then install that directory:
 
 ```sh
-dsh plugin --profile web add "file:/absolute/path/to/local-plugins/dsh-notification"
+dsh plugin --profile web add "link:/absolute/path/to/local-plugins/dsh-notification"
 ```
 
 The release includes the built host/client artifacts; no build or development dependency installation is needed in the extracted directory. See [INSTALL.zh-CN.md](<INSTALL.zh-CN.md>) for extraction and installation instructions. This local release is not an uploaded GitHub/npm release.
 
-Restart the web server so the host half and the served client bundle pick up the plugin. The default `dsh web` profile has the required client composition (the session list, the settings shell, locale, and the workspace navigation service).
+Link mode keeps `node_modules/dsh-notification` as a symlink to the extracted directory, so a rebuilt `lib/` is picked up without copying files again or reinstalling the plugin. The `file:` form also installs, but pnpm materializes a copy; subsequent builds must be copied into that copy and the profile relinked. The default `dsh web` profile has the required client composition (the session list, the settings shell, locale, and the workspace navigation service); restart the web server after a host change, while a client-only change needs HMR or a page refresh.
 
 Version `0.8.0` targets Harness `0.2.2-alpha.3` and retains adapters for legacy client package layouts and pending sources. Switching to the notification's session on click needs the Harness workspace navigation service (`uiWorkspace`), which 0.1.5-rc.1 and other builds providing that service expose; where it is missing, system notification clicks still focus the window but session navigation is skipped for both reminder channels.
 

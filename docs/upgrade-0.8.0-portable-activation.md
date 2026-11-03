@@ -4,19 +4,19 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档状态 | 已批准，待实施 |
+| 文档状态 | 已批准，已实施（2026-11-04） |
 | 适用插件 | `dsh-notification` 0.7.7 → 0.8.0 |
 | 目标 DSH | 0.2.2-alpha.3 |
 | 契约版本 | v1（tag 与 hash 格式冻结） |
 | 日期 | 2026-11-04 |
 | 关联文档 | [便携壳体接口消费说明](./portable-shell-interface.md) |
-| 本轮范围 | 仅落盘两份文档；不改代码、不构建、不安装、不重启 |
+| 本轮范围 | WP1–WP8：代码、测试、构建、文档与 `link:` 模式安装 |
 
 ## 0. 结论
 
 本次升级是纯客户端增量：在 `dsh-notification` 内增加一个 hash 激活控制器，消费便携壳体写入的 `#dsh-session=<id>&n=<nonce>`，等待 `sessions.list` 就绪后调用 `uiWorkspace.openSession(id)`，成功后清掉 hash。Host 半、session projection、设置 schema、通知 tag 格式都不变。
 
-可行性已经在本机 DSH 0.2.2-alpha.3 上逐项核对：`uiWorkspace.openSession` 存在且被 DSH 自己的多个客户端包使用；`sessions.list` 暴露 `phase`、`ids`、`byId` 与 `refresh()`；DSH 前端没有 hash 路由；`history.replaceState` 清 hash 不会触发路由或重载。真正的风险不在 DSH 接口，而在三处契约：通知 tag 的格式、Windows Tag 的 64 字符上限、以及 `file:` 安装目录的硬链接式部署。
+可行性已经在本机 DSH 0.2.2-alpha.3 上逐项核对：`uiWorkspace.openSession` 存在且被 DSH 自己的多个客户端包使用；`sessions.list` 暴露 `phase`、`ids`、`byId` 与 `refresh()`；DSH 前端没有 hash 路由；`history.replaceState` 清 hash 不会触发路由或重载。真正的风险不在 DSH 接口，而在三处契约：通知 tag 的格式、Windows Tag 的 64 字符上限，以及安装目录与 profile 的链接方式。实施时已把 profile 从 `file:` 硬链接副本切换为 `link:` 符号链接。
 
 ## 1. 目标与验收基线
 
@@ -259,17 +259,17 @@ pnpm run check
 
 `pnpm build` 会写 `lib/index.js`、`lib/client.js`、`lib/assets/icon.svg`、`lib/types/**/*.d.ts`，其中 client bundle 是页面实际加载的文件（[`build.mjs`](../build.mjs#L15-L55)）。版本号在 [`package.json:4`](../package.json#L4)，构建不会自动 bump。
 
-安装目录是真实目录，profile 的 `node_modules/dsh-notification` 是 pnpm `nodeLinker: hoisted` 下的硬链接副本（[`~/.dsh/profiles/web/package.json:36`](/home/andyk/.dsh/profiles/web/package.json#L36)、[`pnpm-workspace.yaml:4`](/home/andyk/.dsh/profiles/web/pnpm-workspace.yaml#L4)、[`pnpm-lock.yaml:32–34`](/home/andyk/.dsh/profiles/web/pnpm-lock.yaml#L32-L34)）。就地覆盖会同时更新 profile；替换文件会断链，需要重新 `pnpm install` 或 `dsh plugin add`。
+安装目录是真实目录。profile 使用 `link:` 依赖（[`~/.dsh/profiles/web/package.json:36`](/home/andyk/.dsh/profiles/web/package.json#L36) 记录 `link:/home/andyk/.dsh-local-plugins/dsh-notification`），pnpm 在 `node_modules/dsh-notification` 建立指向该目录的符号链接（[`pnpm-workspace.yaml:4`](/home/andyk/.dsh/profiles/web/pnpm-workspace.yaml#L4)）。构建后只需覆盖安装目录中的产物，符号链接会立即指向新文件，不需要复制第二份或重新安装。`file:` 模式会生成硬链接副本，就地覆盖会断链、替换文件会留下旧副本，因此不再用于本插件；从旧安装切换到 link 模式时执行一次 `dsh plugin --profile web add link:<目录>`。
 
 部署步骤：
 
 1. 仓库内 `pnpm run check`，确认 typecheck、测试、构建都过。
 2. bump `package.json` 到 `0.8.0`，同步 README/INSTALL 的版本与 DSH 目标。
 3. 重建 `lib/`，提交源码与产物。
-4. 复制 `package.json`、`lib/`、`locale/`、`assets/`、`cordis.patch.yml`、README 到 `~/.dsh-local-plugins/dsh-notification`；就地 `cp` 保留硬链接。
-5. 观察 HMR 是否重载插件；没有则重启 `dsh web` 并刷新页面。
+4. 把 `package.json`、`lib/`、`locale/`、`assets/`、`cordis.patch.yml`、README 与 `docs/` 复制到 `~/.dsh-local-plugins/dsh-notification`；link 模式下这就是唯一需要更新的位置。
+5. 观察 HMR 是否重载 client bundle；没有则刷新页面。只有 `lib/index.js` 或 host 字段变化才重启 `dsh web`。
 6. 按验收清单逐项验证；重点看冷启动、原生 toast、连续点击、归档/删除、Action Center 重启。
-7. 回滚时用 `~/.dsh-local-plugins/dsh-notification.backup-*` 恢复目录，重新 `pnpm install`（若断链），重启 `dsh web`。
+7. 回滚时用 `~/.dsh-local-plugins/dsh-notification.backup-*` 恢复目录；仍为 link 模式时无需重装，仅在依赖记录被改回 `file:` 时执行一次 `dsh plugin add link:<目录>`。
 
 生效判断：
 
@@ -291,7 +291,7 @@ pnpm run check
 | 重复 openSession | 多次 retain/release、重复选中 | 共享 `reveal` + nonce + 750ms 去重 |
 | 冷启动列表慢 | 激活失败 | 20s 超时、一次 `refresh()`、日志可诊断 |
 | 测试 stub 不全 | 现有测试被破坏 | 控制器依赖注入，`window` 只在接线层读取 |
-| 硬链接部署 | 新旧文件混用 | 就地覆盖或重新 `pnpm install`；HMR 后看控制台 |
+| 安装目录与 profile 脱节 | 旧产物继续被加载 | 使用 `link:` 符号链接；`file:` 模式需就地覆盖并重新链接 |
 | 文档滞后 | 按旧版本部署 | 版本、DSH 目标、契约一次改齐 |
 
 ## 10. 完成定义
@@ -321,3 +321,4 @@ pnpm run check
 | 日期 | 版本 | 内容 |
 | --- | --- | --- |
 | 2026-11-04 | 1.0 | 初稿；确认可行性、契约、工作包、测试与部署计划 |
+| 2026-11-04 | 1.1 | 实施完成；部署方式由 `file:` 硬链接副本改为 `link:` 符号链接，更新部署步骤、风险与生效说明 |
